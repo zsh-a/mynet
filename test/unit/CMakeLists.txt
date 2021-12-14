@@ -1,0 +1,5 @@
+add_executable(unit_test unit_test.cc)
+# target_link_libraries(unit_test PRIVATE PRIVATE Catch2::Catch2 Catch2::Catch2WithMain mynet)
+target_link_libraries(unit_test PRIVATE GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main mynet)
+enable_testing()
+add_test(test_all unit_test)

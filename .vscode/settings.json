@@ -65,6 +65,13 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "cinttypes": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "coroutine": "cpp",
+        "future": "cpp",
+        "any": "cpp",
+        "shared_mutex": "cpp",
+        "cfenv": "cpp",
+        "variant": "cpp",
+        "ranges": "cpp"
     }
 }
