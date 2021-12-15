@@ -17,14 +17,25 @@ using namespace mynet;
 //   for (int i = 0; i < 100; i++) co_yield i;
 // }
 
-Task<std::string> hello() { co_return "hello"; }
+Task<std::string> hello() {
+  fmt::print("enter hello\n");
 
-Task<std::string> world() { co_return "world"; }
+  co_await mynet::sleep(2000);
+  fmt::print("leave hello\n");
+  co_return "hello";
+}
+
+Task<std::string> world() {
+  fmt::print("enter world\n");
+  co_await mynet::sleep(1000);
+  fmt::print("leave world\n");
+  co_return "world";
+}
 
 Task<std::string> helloworld() {
-  auto a = co_await hello();
-  auto b = co_await world();
-  co_return fmt::format("{} {}", a, b);
+  auto h = mynet::create_task(hello());
+  auto w = mynet::create_task(world());
+  co_return fmt::format("{} {}", h.get_result(), w.get_result());
 }
 
 // Task<std::string> run_once() {
@@ -78,18 +89,16 @@ Task<Dummy> coro4(std::vector<int>& result) {
 }
 
 int main() {
-  {
-    auto task = hello();
-    while (!task.done()) task.resume();
-    fmt::print("{}\n", task.get_result());
-  }
+  // {
+  //   auto task = hello();
+  //   while (!task.done()) task.resume();
+  //   fmt::print("{}\n", task.get_result());
+  // }
 
   {
+    auto& loop = EventLoop::get();
     auto task = helloworld();
-    while (!task.done()) {
-      fmt::print("resume\n");
-      task.resume();
-    }
+    loop.run_immediately(task.get_resumable());
     fmt::print("{}\n", task.get_result());
   }
 
@@ -107,14 +116,10 @@ int main() {
 
   {
     std::vector<int> result;
-    auto g = coro2(result);
-    while (!g.done()) {
-      for (auto x : result) {
-        fmt::print("{} ", x);
-      }
-      fmt::print("\n");
-      fmt::print("resume\n");
-      g.resume();
+    auto& loop = EventLoop::get();
+    loop.run_until_done(coro2(result).get_resumable());
+    for (auto x : result) {
+      fmt::print("{} ", x);
     }
   }
   // {
@@ -126,9 +131,9 @@ int main() {
   //   fmt::print("{} \n", loop.time());
   // }
 
-  {
-    auto g = run_sleep();
-    auto& loop = EventLoop::get();
-    loop.run();
-  }
+  // {
+  //   auto g = run_sleep();
+  //   auto& loop = EventLoop::get();
+  //   loop.run();
+  // }
 }

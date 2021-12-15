@@ -4,6 +4,7 @@
 #include "mynet/common.h"
 #include "mynet/resumable.h"
 #include "mynet/event_loop.h"
+#include "fmt/format.h"
 namespace mynet {
 template <typename R = void>
 struct Task {
@@ -14,7 +15,19 @@ struct Task {
     Task get_return_object() { return Task(coro_handle::from_promise(*this)); }
 
     std::suspend_always initial_suspend() { return {}; }
-    std::suspend_always final_suspend() noexcept { return {}; }
+    struct final_awaiter {
+        constexpr bool await_ready() const noexcept { return false; }
+        template<typename Promise>
+        constexpr void await_suspend(std::coroutine_handle<Promise> h) const noexcept {
+            if (auto cont = h.promise().continuation_) {
+                EventLoop& loop_{EventLoop::get()};
+                loop_.run_immediately(std::make_unique<CoResumable>(cont));
+            }
+        }
+        constexpr void await_resume() const noexcept {}
+    };
+
+    auto final_suspend() noexcept { return final_awaiter{}; }
     void return_value(R&& value) { value_ = std::forward<R>(value); }
     void unhandled_exception() { std::terminate(); }
 
@@ -38,35 +51,17 @@ struct Task {
     // auto await_transform(Cont continuation) {
     //   return awaiter{continuation};
     // }
+    std::coroutine_handle<> continuation_;
   };
 
   auto operator co_await(){
     struct Awaiter {
       bool await_ready() { return false; }
       void await_suspend(std::coroutine_handle<> caller) {
-        struct CallAndReturn : public Resumable{
-          coro_handle self_;
-          std::coroutine_handle<> caller_;
-          EventLoop& loop{EventLoop::get()};
-          CallAndReturn(coro_handle self,std::coroutine_handle<> caller):
-            self_(self),caller_(caller)
-          {
-
-          }
-          void resume() override{
-            self_.resume();
-            loop.run_immediately(std::make_unique<CoResumable>(caller_)); 
-          }
-          bool done() override{
-            return self_.done();
-          }
-          ~CallAndReturn()override{
-            if(done()) self_.destroy();
-          }
-        };
-        loop.run_immediately(std::make_unique<CallAndReturn>(self_,caller));
+        self_.promise().continuation_ = caller; // save caller to continuation_
+        loop.run_immediately(std::make_unique<CoResumable>(self_));
       }
-      R await_resume() { return R{}; }
+      R await_resume() { return self_.promise().value_; }
 
       coro_handle self_;
       EventLoop& loop{EventLoop::get()};
@@ -79,6 +74,10 @@ struct Task {
   }
 
   Task(const auto& handle) : handle_(handle) {}
+
+  ~Task() {
+    if(handle_.done()) handle_.destroy();
+  }
 
   bool done() { return handle_.done(); }
   void resume() { handle_.resume(); }
@@ -115,5 +114,12 @@ struct NoWaitTask {
   //  private:
   coro_handle handle_;
 };
+
+template<typename Task>
+auto create_task(Task&& task){
+  auto& loop = EventLoop::get();
+  loop.run_immediately(task.get_resumable());
+  return task;
+}
 
 }  // namespace mynet

@@ -56,12 +56,12 @@ class EventLoop : private NonCopyable {
   }
 
   void run() {
-    // while (1) {
+    while (schedule_.size() || ready_.size()) {
       run_once();
-    //   auto now = system_clock::now();
-    //   auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
-    //   if (time - start_time_ >= 5000) break;
-    // }
+      // auto now = system_clock::now();
+      // auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
+      // if (time - start_time_ >= 5000) break;
+    }
   }
 
   void pop_schedule() {
@@ -86,7 +86,7 @@ class EventLoop : private NonCopyable {
     while (ready_.size()) {
       auto handle = std::move(ready_.front());
       ready_.pop();
-      while (!handle->done()) handle->resume();
+      handle->resume();
     }
   }
 };

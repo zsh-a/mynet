@@ -14,6 +14,7 @@ target_include_directories(${PROJECT_NAME}
 # find_package(Catch2 CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
+# find_path(NANOBENCH_INCLUDE_DIRS "nanobench.h")
 
 add_subdirectory(test)
 

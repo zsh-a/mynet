@@ -21,9 +21,9 @@ struct CoResumable : public Resumable {
     return handle_.done();
   }
 
-  ~CoResumable() override {
-    if(done()) handle_.destroy();
-  }
+  // ~CoResumable() override {
+  //   if(done()) handle_.destroy();
+  // }
 };
 
 }  // namespace mynet

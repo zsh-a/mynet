@@ -31,6 +31,24 @@ TEST(epoll, timeout) {
 
 using namespace mynet;
 
+Task<int> many_resume(){
+  co_await std::suspend_always{};
+  co_await std::suspend_always{};
+  fmt::print("~~~~~~~~~\n");
+  co_return 0;
+}
+
+TEST(task, many_resume) {
+  using namespace mynet;
+  auto& loop = EventLoop::get();
+  auto g = many_resume();
+  loop.run_until_done(many_resume().get_resumable());
+  // while(!g.done()) g.resume();
+  EXPECT_EQ(g.get_result(),0);
+}
+
+
+
 struct Dummy {};
 Task<Dummy> coro1(std::vector<int>& result) {
   result.push_back(1);
@@ -87,4 +105,57 @@ TEST_F(TaskAwaitTest, task2) {
   auto& loop = EventLoop::get();
   loop.run_until_done(coro2(result).get_resumable());
   EXPECT_EQ(result, expected);
+}
+
+TEST_F(TaskAwaitTest, task3) {
+  std::vector<int> expected{3,2,1,20,30};
+  auto& loop = EventLoop::get();
+  loop.run_until_done(coro3(result).get_resumable());
+  EXPECT_EQ(result, expected);
+}
+
+TEST_F(TaskAwaitTest, task4) {
+  std::vector<int> expected{4,3,2,1,20,30,40};
+  auto& loop = EventLoop::get();
+  loop.run_until_done(coro4(result).get_resumable());
+  EXPECT_EQ(result, expected);
+}
+
+Task<int> mul(int a,int b){
+  co_return a * b;
+}
+
+Task<int> get_await_result(){
+  auto a = co_await mul(2,3);
+  auto b = co_await mul(4,5);
+  co_return a + b;
+}
+
+TEST(task, get_await_result) {
+  using namespace mynet;
+  auto& loop = EventLoop::get();
+  auto g = get_await_result();
+  loop.run_until_done(g.get_resumable());
+  EXPECT_EQ(g.get_result(),26);
+}
+
+Task<int> fibo(int n){
+  if(n <= 1) co_return n;
+  co_return co_await fibo(n - 1) + co_await fibo(n - 2);
+}
+
+TEST(task, fibo3) {
+  using namespace mynet;
+  auto& loop = EventLoop::get();
+  auto g = fibo(3);
+  loop.run_until_done(g.get_resumable());
+  EXPECT_EQ(g.get_result(),2);
+}
+
+TEST(task, fibo7) {
+  using namespace mynet;
+  auto& loop = EventLoop::get();
+  auto g = fibo(8);
+  loop.run_until_done(g.get_resumable());
+  EXPECT_EQ(g.get_result(),21);
 }

@@ -72,6 +72,10 @@
         "shared_mutex": "cpp",
         "cfenv": "cpp",
         "variant": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "format": "cpp",
+        "complex": "cpp",
+        "forward_list": "cpp",
+        "typeindex": "cpp"
     }
 }
