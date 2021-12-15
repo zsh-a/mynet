@@ -8,4 +8,22 @@ struct Resumable {
   virtual ~Resumable() = default;
 };
 
+struct CoResumable : public Resumable {
+
+  std::coroutine_handle<> handle_;
+  CoResumable(std::coroutine_handle<> h):handle_(h){
+
+  }
+  void resume() override {
+    handle_.resume();
+  }
+  bool done() override {
+    return handle_.done();
+  }
+
+  ~CoResumable() override {
+    if(done()) handle_.destroy();
+  }
+};
+
 }  // namespace mynet

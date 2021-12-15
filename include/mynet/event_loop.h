@@ -5,14 +5,15 @@
 #include <queue>
 
 #include "mynet/common.h"
-#include "mynet/task.h"
+#include "mynet/poller/epoller.h"
+#include "mynet/resumable.h"
+#include "fmt/format.h"
 namespace mynet {
 using namespace std::chrono;
+using TimeDuration = milliseconds;
 class EventLoop : private NonCopyable {
-  using TimeDuration = milliseconds;
-
-  std::queue<Resumable*> ready_;
-  using TimerHandle = std::pair<TimeDuration::rep, Resumable*>;
+  std::queue<std::unique_ptr<Resumable>> ready_;
+  using TimerHandle = std::pair<TimeDuration::rep, std::unique_ptr<Resumable>>;
   std::vector<TimerHandle> schedule_;  // heap
 
  public:
@@ -34,31 +35,39 @@ class EventLoop : private NonCopyable {
            start_time_;
   }
 
-  void run_at(TimeDuration::rep when, Resumable* task) {
-    schedule_.emplace_back(when, task);
-    std::push_heap(schedule_.begin(), schedule_.end(), greater{});
+  void run_immediately(std::unique_ptr<Resumable> task){
+    ready_.emplace(std::move(task));
   }
 
-  void run_delay(TimeDuration::rep delay, Resumable* task) {
+  void run_at(TimeDuration::rep when, std::unique_ptr<Resumable> task) {
+    schedule_.emplace_back(when, std::move(task));
+    std::push_heap(schedule_.begin(), schedule_.end(), std::greater{});
+  }
+
+  void run_delay(TimeDuration::rep delay, std::unique_ptr<Resumable> task) {
     auto now = system_clock::now();
-    schedule_.emplace_back(
-        duration_cast<TimeDuration>(now.time_since_epoch()).count() + delay,
-        task);
-    std::push_heap(schedule_.begin(), schedule_.end(), greater<std::pair<int,int>{});
+    run_at(duration_cast<TimeDuration>(now.time_since_epoch()).count() + delay,
+           std::move(task));
   }
 
-
-  void run_until_done(Resumable* routine) {
-    ready_.emplace(routine);
+  void run_until_done(std::unique_ptr<Resumable> routine) {
+    ready_.push(std::move(routine));
     run();
   }
 
   void run() {
-    while (1) {
+    // while (1) {
       run_once();
-    }
+    //   auto now = system_clock::now();
+    //   auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
+    //   if (time - start_time_ >= 5000) break;
+    // }
   }
 
+  void pop_schedule() {
+    pop_heap(schedule_.begin(), schedule_.end());
+    schedule_.pop_back();
+  }
   void run_once() {
     TimeDuration::rep timeout{0};
 
@@ -66,9 +75,9 @@ class EventLoop : private NonCopyable {
       auto now = system_clock::now();
       auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
       auto&& [when, task] = schedule_[0];
-      if (when >= time) {
+      if (time >= when) {
         while (!task->done()) task->resume();
-        pop_heap(schedule_.begin(), schedule_.end());
+        pop_schedule();
       } else
         break;
 
