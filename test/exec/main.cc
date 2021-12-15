@@ -9,6 +9,7 @@
 #include "mynet/event_loop.h"
 #include "mynet/sleep.h"
 #include "mynet/task.h"
+#include "mynet/sockets.h"
 using namespace std;
 using namespace mynet;
 // using IntGenerator = Generator<int>;
@@ -49,45 +50,6 @@ NoWaitTask<> run_sleep() {
   fmt::print("timeout\n");
 }
 
-std::vector<int> v;
-
-Task<int> vec1() { v.push_back(1); }
-Task<int> vec2() { v.push_back(2); }
-
-Task<int> run_vec() {
-  v.push_back(3);
-  co_await vec1();
-  v.push_back(4);
-  co_await vec2();
-}
-
-struct Dummy {};
-Task<Dummy> coro1(std::vector<int>& result) {
-  result.push_back(1);
-  co_return Dummy{};
-}
-
-Task<Dummy> coro2(std::vector<int>& result) {
-  result.push_back(2);
-  co_await coro1(result);
-  result.push_back(20);
-  co_return Dummy{};
-}
-
-Task<Dummy> coro3(std::vector<int>& result) {
-  result.push_back(3);
-  co_await coro2(result);
-  result.push_back(30);
-  co_return Dummy{};
-}
-
-Task<Dummy> coro4(std::vector<int>& result) {
-  result.push_back(4);
-  co_await coro3(result);
-  result.push_back(40);
-  co_return Dummy{};
-}
-
 int main() {
   // {
   //   auto task = hello();
@@ -95,12 +57,12 @@ int main() {
   //   fmt::print("{}\n", task.get_result());
   // }
 
-  {
-    auto& loop = EventLoop::get();
-    auto task = helloworld();
-    loop.run_immediately(task.get_resumable());
-    fmt::print("{}\n", task.get_result());
-  }
+  // {
+  //   auto& loop = EventLoop::get();
+  //   auto task = helloworld();
+  //   loop.run_immediately(task.get_resumable());
+  //   fmt::print("{}\n", task.get_result());
+  // }
 
   // {
   //   auto g = run_vec();
@@ -114,14 +76,14 @@ int main() {
   //   }
   // }
 
-  {
-    std::vector<int> result;
-    auto& loop = EventLoop::get();
-    loop.run_until_done(coro2(result).get_resumable());
-    for (auto x : result) {
-      fmt::print("{} ", x);
-    }
-  }
+  // {
+  //   std::vector<int> result;
+  //   auto& loop = EventLoop::get();
+  //   loop.run_until_done(coro2(result).get_resumable());
+  //   for (auto x : result) {
+  //     fmt::print("{} ", x);
+  //   }
+  // }
   // {
   //   auto& loop = EventLoop::get();
   //   auto g = run_once();
@@ -131,9 +93,11 @@ int main() {
   //   fmt::print("{} \n", loop.time());
   // }
 
-  // {
-  //   auto g = run_sleep();
-  //   auto& loop = EventLoop::get();
-  //   loop.run();
-  // }
+  {
+    auto& loop = EventLoop::get();
+
+    open_connection("127.0.0.1",22);
+
+    // loop.run_once();
+  }
 }

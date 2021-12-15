@@ -11,11 +11,12 @@
 namespace mynet {
 using namespace std::chrono;
 using TimeDuration = milliseconds;
+using Poller = Epoller;
 class EventLoop : private NonCopyable {
   std::queue<std::unique_ptr<Resumable>> ready_;
   using TimerHandle = std::pair<TimeDuration::rep, std::unique_ptr<Resumable>>;
   std::vector<TimerHandle> schedule_;  // heap
-
+  Poller poller_;
  public:
   TimeDuration::rep start_time_;
 
@@ -83,12 +84,38 @@ class EventLoop : private NonCopyable {
 
       //   timeout = when;
     }
+
+    auto events = poller_.poll(5000);
+
+    for(const auto& e : events){
+      ready_.push(std::unique_ptr<Resumable>(reinterpret_cast<Resumable*>(e.ptr)));
+      fmt::print("event {} \n",e.ptr);
+    }
+
     while (ready_.size()) {
       auto handle = std::move(ready_.front());
       ready_.pop();
       handle->resume();
     }
   }
+
+  struct AwaiterEvent{
+    bool await_ready() { return false; }
+    template<typename Promise>
+    void await_suspend(std::coroutine_handle<Promise> h) {
+      event_.ptr = &h.promise();
+      poller_.register_event(event_);
+    }
+    constexpr void await_resume() const noexcept {}
+    // R await_resume() { return self_.promise().value_; }
+    Event event_;
+    Poller poller_;
+  };
+
+  auto wait_event(const Event& event){
+    return AwaiterEvent{event,poller_};
+  }
+
 };
 
 }  // namespace mynet

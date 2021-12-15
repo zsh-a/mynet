@@ -5,13 +5,14 @@
 #include "mynet/resumable.h"
 #include "mynet/event_loop.h"
 #include "fmt/format.h"
+#include<optional>
 namespace mynet {
 template <typename R = void>
 struct Task {
   struct promise_type;
   using coro_handle = std::coroutine_handle<promise_type>;
 
-  struct promise_type {
+  struct promise_type : public Resumable{
     Task get_return_object() { return Task(coro_handle::from_promise(*this)); }
 
     std::suspend_always initial_suspend() { return {}; }
@@ -28,11 +29,19 @@ struct Task {
     };
 
     auto final_suspend() noexcept { return final_awaiter{}; }
-    void return_value(R&& value) { value_ = std::forward<R>(value); }
+    void return_value(R&& value) { value_.emplace(std::forward<R>(value));}
     void unhandled_exception() { std::terminate(); }
 
+    void resume() override{
+      auto handle = coro_handle::from_promise(*this);
+      handle.resume();
+    }
+    bool done() override{
+      return coro_handle::from_promise(*this).done();
+    }
+
     R& get_result() { return value_; }
-    R value_;
+    std::optional<R> value_;
 
     // template <typename U>
     // struct awaiter {
@@ -61,7 +70,7 @@ struct Task {
         self_.promise().continuation_ = caller; // save caller to continuation_
         loop.run_immediately(std::make_unique<CoResumable>(self_));
       }
-      R await_resume() { return self_.promise().value_; }
+      std::optional<R> await_resume() { return self_.promise().value_; }
 
       coro_handle self_;
       EventLoop& loop{EventLoop::get()};
