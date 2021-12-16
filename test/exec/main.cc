@@ -50,6 +50,18 @@ NoWaitTask<> run_sleep() {
   fmt::print("timeout\n");
 }
 
+Task<bool> conn_test(){
+  auto conn = co_await open_connection("127.0.0.1",8000);
+  // co_await mynet::sleep(5000);
+  fmt::print("xxx {} \n",conn.fd_);
+  // co_await mynet::sleep(10000);
+  auto buf = co_await conn.read(100);
+
+  for(auto x : buf) fmt::print("{}",x);
+  fmt::print("\n");
+  co_return true;
+}
+
 int main() {
   // {
   //   auto task = hello();
@@ -95,9 +107,11 @@ int main() {
 
   {
     auto& loop = EventLoop::get();
+    mynet::create_task(conn_test());
+    loop.run();
 
-    open_connection("127.0.0.1",22);
-
-    // loop.run_once();
+    // Epoller poller{};
+    // fmt::print("fd {} \n",poller.fd_);
+    // poller.register_event(Event{.fd = 0,.events = EPOLLIN});
   }
 }

@@ -13,10 +13,11 @@ using namespace std::chrono;
 using TimeDuration = milliseconds;
 using Poller = Epoller;
 class EventLoop : private NonCopyable {
-  std::queue<std::unique_ptr<Resumable>> ready_;
-  using TimerHandle = std::pair<TimeDuration::rep, std::unique_ptr<Resumable>>;
+  std::queue<Resumable*> ready_;
+  using TimerHandle = std::pair<TimeDuration::rep, Resumable*>;
   std::vector<TimerHandle> schedule_;  // heap
   Poller poller_;
+
  public:
   TimeDuration::rep start_time_;
 
@@ -36,28 +37,28 @@ class EventLoop : private NonCopyable {
            start_time_;
   }
 
-  void run_immediately(std::unique_ptr<Resumable> task){
-    ready_.emplace(std::move(task));
+  void run_immediately(Resumable* task){
+    ready_.emplace(task);
   }
 
-  void run_at(TimeDuration::rep when, std::unique_ptr<Resumable> task) {
-    schedule_.emplace_back(when, std::move(task));
+  void run_at(TimeDuration::rep when, Resumable* task) {
+    schedule_.emplace_back(when, task);
     std::push_heap(schedule_.begin(), schedule_.end(), std::greater{});
   }
 
-  void run_delay(TimeDuration::rep delay, std::unique_ptr<Resumable> task) {
+  void run_delay(TimeDuration::rep delay, Resumable* task) {
     auto now = system_clock::now();
     run_at(duration_cast<TimeDuration>(now.time_since_epoch()).count() + delay,
-           std::move(task));
+           task);
   }
 
-  void run_until_done(std::unique_ptr<Resumable> routine) {
-    ready_.push(std::move(routine));
+  void run_until_done(Resumable* routine) {
+    ready_.push(routine);
     run();
   }
 
   void run() {
-    while (schedule_.size() || ready_.size()) {
+    while (schedule_.size() || ready_.size() || !poller_.is_stop()) {
       run_once();
       // auto now = system_clock::now();
       // auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
@@ -70,7 +71,22 @@ class EventLoop : private NonCopyable {
     schedule_.pop_back();
   }
   void run_once() {
-    TimeDuration::rep timeout{0};
+    // TimeDuration::rep timeout{0};
+
+    int timeout = -1;
+    if(ready_.size()) timeout = 0;
+    else timeout = 5000;
+    auto events = poller_.poll(timeout);
+    fmt::print("{} events happened\n",events.size());
+
+    for(const auto& e : events){
+      ready_.push(reinterpret_cast<Resumable*>(e.ptr));
+    }
+    while (ready_.size()) {
+      auto handle = std::move(ready_.front());
+      ready_.pop();
+      handle->resume();
+    }
 
     while (schedule_.size()) {
       auto now = system_clock::now();
@@ -84,19 +100,6 @@ class EventLoop : private NonCopyable {
 
       //   timeout = when;
     }
-
-    auto events = poller_.poll(5000);
-
-    for(const auto& e : events){
-      ready_.push(std::unique_ptr<Resumable>(reinterpret_cast<Resumable*>(e.ptr)));
-      fmt::print("event {} \n",e.ptr);
-    }
-
-    while (ready_.size()) {
-      auto handle = std::move(ready_.front());
-      ready_.pop();
-      handle->resume();
-    }
   }
 
   struct AwaiterEvent{
@@ -107,9 +110,9 @@ class EventLoop : private NonCopyable {
       poller_.register_event(event_);
     }
     constexpr void await_resume() const noexcept {}
-    // R await_resume() { return self_.promise().value_; }
+    void await_resume() { poller_.remove_event(event_); }
     Event event_;
-    Poller poller_;
+    Poller& poller_;
   };
 
   auto wait_event(const Event& event){

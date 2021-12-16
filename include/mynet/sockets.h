@@ -5,8 +5,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "mynet/task.h"
 #include "mynet/connection.h"
+#include "mynet/task.h"
 namespace mynet {
 
 namespace internel {
@@ -15,12 +15,18 @@ Task<bool> connect(int fd, const sockaddr* addr, socklen_t len) noexcept {
   if (ret == 0) co_return true;
   if (ret < 0 && errno != EINPROGRESS) {
     perror("exception happened");
-    exit(EINPROGRESS);
+    exit(errno);
   }
 
   auto& loop = EventLoop::get();
   Event ev{.fd = fd, .events = EPOLLOUT};
   co_await loop.wait_event(ev);
+  int result{0};
+  socklen_t result_len = sizeof(result);
+  if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &result, &result_len) < 0) {
+    co_return false;
+  }
+  co_return result == 0;
 }
 
 struct AddressInfo {
@@ -47,19 +53,23 @@ Task<Connection> open_connection(std::string_view ip, int port) {
   int fd = -1;
   for (auto p = server_info; p != nullptr; p = p->ai_next) {
     fd = -1;
+
     if ((fd = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK,
                      p->ai_protocol)) == 1)
       continue;
-    if(!(co_await internel::connect(fd,p->ai_addr,p->ai_addrlen))){
-        fmt::print("connect to {}:{} failed, retrying\n",p->ai_addr->sa_data,port_str);
-        close(fd);
-        continue;
+    if ((co_await internel::connect(fd, p->ai_addr, p->ai_addrlen))) {
+      break;
     }
+          fmt::print("connect to {}:{} failed, retrying\n", p->ai_addr->sa_data,
+                 port_str);
+    ::close(fd);
   }
-  if(fd == -1){
-      perror("socket connect failed");
-      exit(fd);
+
+  if (fd == -1) {
+    perror("socket connect failed");
+    exit(fd);
   }
+
   co_return Connection{fd};
 }
 

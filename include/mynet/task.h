@@ -22,7 +22,7 @@ struct Task {
         constexpr void await_suspend(std::coroutine_handle<Promise> h) const noexcept {
             if (auto cont = h.promise().continuation_) {
                 EventLoop& loop_{EventLoop::get()};
-                loop_.run_immediately(std::make_unique<CoResumable>(cont));
+                loop_.run_immediately(cont);
             }
         }
         constexpr void await_resume() const noexcept {}
@@ -39,8 +39,7 @@ struct Task {
     bool done() override{
       return coro_handle::from_promise(*this).done();
     }
-
-    R& get_result() { return value_; }
+    R&& get_result() { return std::move(value_).value(); }
     std::optional<R> value_;
 
     // template <typename U>
@@ -60,26 +59,30 @@ struct Task {
     // auto await_transform(Cont continuation) {
     //   return awaiter{continuation};
     // }
-    std::coroutine_handle<> continuation_;
+    Resumable* continuation_;
+  };
+
+  struct Awaiter {
+    bool await_ready() { return false; }
+    
+    template<typename Promise>
+    void await_suspend(std::coroutine_handle<Promise> caller) {
+      self_.promise().continuation_ = &caller.promise(); // save caller to continuation_
+      loop.run_immediately(&self_.promise());
+    }
+    R&& await_resume() { return std::move(self_.promise().value_).value(); }
+
+    coro_handle self_;
+    EventLoop& loop{EventLoop::get()};
   };
 
   auto operator co_await(){
-    struct Awaiter {
-      bool await_ready() { return false; }
-      void await_suspend(std::coroutine_handle<> caller) {
-        self_.promise().continuation_ = caller; // save caller to continuation_
-        loop.run_immediately(std::make_unique<CoResumable>(self_));
-      }
-      std::optional<R> await_resume() { return self_.promise().value_; }
-
-      coro_handle self_;
-      EventLoop& loop{EventLoop::get()};
-    };
+    
     return Awaiter{handle_};
   }
 
-  std::unique_ptr<Resumable> get_resumable() {
-    return std::make_unique<CoResumable>(handle_);
+  Resumable* get_resumable() {
+    return &handle_.promise();
   }
 
   Task(const auto& handle) : handle_(handle) {}
@@ -90,7 +93,7 @@ struct Task {
 
   bool done() { return handle_.done(); }
   void resume() { handle_.resume(); }
-  R& get_result() { return handle_.promise().value_; }
+  R&& get_result() { return std::move(handle_.promise().value_).value(); }
 
   //  private:
   coro_handle handle_;
@@ -101,7 +104,7 @@ struct NoWaitTask {
   struct promise_type;
   using coro_handle = std::coroutine_handle<promise_type>;
 
-  struct promise_type {
+  struct promise_type : public Resumable {
     NoWaitTask get_return_object() { return NoWaitTask(coro_handle::from_promise(*this)); }
 
     std::suspend_never initial_suspend() { return {}; }
@@ -109,6 +112,15 @@ struct NoWaitTask {
     // void return_value(R&& value) { value_ = std::forward<R>(value); }
     void return_void() {}
     void unhandled_exception() { std::terminate(); }
+    
+    void resume() override{
+      auto handle = coro_handle::from_promise(*this);
+      handle.resume();
+    }
+    bool done() override{
+      return coro_handle::from_promise(*this).done();
+    }
+
   };
 
   std::unique_ptr<Resumable> get_resumable() {

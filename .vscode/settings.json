@@ -76,6 +76,8 @@
         "format": "cpp",
         "complex": "cpp",
         "forward_list": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "*.inc": "cpp",
+        "csignal": "cpp"
     }
 }

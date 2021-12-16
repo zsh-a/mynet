@@ -5,13 +5,13 @@
 namespace mynet {
 
 class Connection : NonCopyable {
+public:
   int fd_{-1};
   sockaddr_storage sock_info_{};
 
  public:
   using Buffer = std::vector<char>;
   constexpr static auto BUFFER_SIZE = 4 * 1024;
-  Connection() {}
   Connection(Connection&& conn)
       : fd_(std::exchange(conn.fd_, -1)), sock_info_(conn.sock_info_) {}
   Connection(int fd) : fd_(fd) {
@@ -55,7 +55,9 @@ class Connection : NonCopyable {
   }
 
   ~Connection() {
-    if (fd_ > 0) ::close(fd_);
+    if (fd_ > 0) {
+      ::close(fd_);
+    }
   }
 };
 

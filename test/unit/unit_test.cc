@@ -38,14 +38,14 @@ Task<int> many_resume(){
   co_return 0;
 }
 
-TEST(task, many_resume) {
-  using namespace mynet;
-  auto& loop = EventLoop::get();
-  auto g = many_resume();
-  loop.run_until_done(many_resume().get_resumable());
-  // while(!g.done()) g.resume();
-  EXPECT_EQ(g.get_result(),0);
-}
+// TEST(task, many_resume) {
+//   using namespace mynet;
+//   auto& loop = EventLoop::get();
+//   auto g = many_resume();
+//   loop.run_until_done(many_resume().get_resumable());
+//   // while(!g.done()) g.resume();
+//   EXPECT_EQ(g.get_result(),0);
+// }
 
 
 
