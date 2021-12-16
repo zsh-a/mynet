@@ -77,13 +77,13 @@ class EventLoop : private NonCopyable {
     if(ready_.size()) timeout = 0;
     else timeout = 5000;
     auto events = poller_.poll(timeout);
-    fmt::print("{} events happened\n",events.size());
+    // fmt::print("{} events happened {} \n",events.size(),system_clock::now().time_since_epoch().count());
 
     for(const auto& e : events){
       ready_.push(reinterpret_cast<Resumable*>(e.ptr));
     }
     while (ready_.size()) {
-      auto handle = std::move(ready_.front());
+      auto handle = ready_.front();
       ready_.pop();
       handle->resume();
     }

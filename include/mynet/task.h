@@ -31,6 +31,9 @@ struct Task {
     auto final_suspend() noexcept { return final_awaiter{}; }
     void return_value(R&& value) { value_.emplace(std::forward<R>(value));}
     void unhandled_exception() { std::terminate(); }
+    // std::suspend_always yield_value(R&& value){
+    //   value_.emplace(std::forward<R>(value));
+    // }
 
     void resume() override{
       auto handle = coro_handle::from_promise(*this);

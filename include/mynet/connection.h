@@ -19,6 +19,9 @@ public:
     getsockname(fd_, reinterpret_cast<sockaddr*>(&sock_info_), &addrlen);
   }
 
+  Connection(int fd,const sockaddr_storage& info) : fd_(fd),sock_info_(info) {
+  }
+
   Task<Buffer> read(ssize_t size = -1) {
     if (size < 0) co_return co_await read_until_eof();
     Event ev{.fd = fd_, .events = EPOLLIN};
@@ -31,7 +34,25 @@ public:
       perror("read error");
       exit(tot_read);
     }
+    res.resize(tot_read);
+    // fmt::print("tot_read read {} bytes\n",tot_read);
     co_return res;
+  }
+  Task<bool> write(const Buffer& buf) {
+    Event ev{.fd = fd_, .events = EPOLLOUT};
+    ssize_t tot_writen = 0;
+    auto& loop = EventLoop::get();
+    while(tot_writen < buf.size()){
+      co_await loop.wait_event(ev);
+      ssize_t writen = ::write(fd_,buf.data() + tot_writen,buf.size() - tot_writen);
+      if(writen < 0){
+        perror("write data failed");
+        co_return false;
+        // exit(errno);
+      }
+      tot_writen += writen;
+    }
+    co_return true;
   }
 
   Task<Buffer> read_until_eof() {
@@ -47,10 +68,13 @@ public:
         perror("read error");
         exit(cur_read);
       }
+      // fmt::print("read {} bytes return {} \n",tot_read,cur_read);
       if (cur_read == 0) break;
+      buf.resize(cur_read);
       res.insert(res.end(), buf.begin(), buf.end());
       tot_read += cur_read;
     }
+    
     co_return res;
   }
 

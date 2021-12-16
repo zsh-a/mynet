@@ -10,6 +10,8 @@
 #include "mynet/sleep.h"
 #include "mynet/task.h"
 #include "mynet/sockets.h"
+#include "mynet/tcp_server.h"
+#include "fmt/os.h"
 using namespace std;
 using namespace mynet;
 // using IntGenerator = Generator<int>;
@@ -53,15 +55,32 @@ NoWaitTask<> run_sleep() {
 Task<bool> conn_test(){
   auto conn = co_await open_connection("127.0.0.1",8000);
   // co_await mynet::sleep(5000);
-  fmt::print("xxx {} \n",conn.fd_);
   // co_await mynet::sleep(10000);
-  auto buf = co_await conn.read(100);
-
-  for(auto x : buf) fmt::print("{}",x);
-  fmt::print("\n");
+  auto buf = co_await conn.read_until_eof();
+  // for(auto x : buf) fmt::print("{}",x);
+  // fmt::print("\n");
+  fmt::print("read {} bytes\n",buf.size());
+  auto out = fmt::output_file("guide.txt");
+  out.print("{}", string(buf.begin(),buf.end()));
   co_return true;
 }
 
+Task<bool> echo_server(Connection conn){
+  while(1){
+    auto buf = co_await conn.read(16* 1024);
+    if(buf.size() == 0) break;
+    // fmt::print("receiving data {}",buf.data());
+    if(!co_await conn.write(buf)) break; 
+  }
+  co_return true;
+}
+
+
+Task<bool> tcp_server_test(){
+  Connection::Buffer buf{'h','e','l','l','o','\n'};
+  auto server = co_await start_tcp_server("0.0.0.0",9999,echo_server);
+  co_await server.serve();
+}
 int main() {
   // {
   //   auto task = hello();
@@ -105,13 +124,16 @@ int main() {
   //   fmt::print("{} \n", loop.time());
   // }
 
+  // {
+  //   auto& loop = EventLoop::get();
+  //   mynet::create_task(conn_test());
+  //   loop.run();
+  // }
+
   {
     auto& loop = EventLoop::get();
-    mynet::create_task(conn_test());
+    mynet::create_task(tcp_server_test());
     loop.run();
-
-    // Epoller poller{};
-    // fmt::print("fd {} \n",poller.fd_);
-    // poller.register_event(Event{.fd = 0,.events = EPOLLIN});
   }
+
 }
