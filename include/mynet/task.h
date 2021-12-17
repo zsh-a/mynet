@@ -43,7 +43,7 @@ struct Task {
       return coro_handle::from_promise(*this).done();
     }
     R&& get_result() { return std::move(value_).value(); }
-    std::optional<R> value_;
+    std::optional<R> value_{};
 
     // template <typename U>
     // struct awaiter {
@@ -62,7 +62,7 @@ struct Task {
     // auto await_transform(Cont continuation) {
     //   return awaiter{continuation};
     // }
-    Resumable* continuation_;
+    Resumable* continuation_{nullptr};
   };
 
   struct Awaiter {
@@ -143,7 +143,7 @@ template<typename Task>
 auto create_task(Task&& task){
   auto& loop = EventLoop::get();
   loop.run_immediately(task.get_resumable());
-  return task;
+  return std::forward<Task>(task);
 }
 
 }  // namespace mynet

@@ -69,7 +69,7 @@ Task<bool> echo_server(Connection conn){
   while(1){
     auto buf = co_await conn.read(16* 1024);
     if(buf.size() == 0) break;
-    // fmt::print("receiving data {}",buf.data());
+    fmt::print("receiving data {}\n",buf.data());
     if(!co_await conn.write(buf)) break; 
   }
   co_return true;
@@ -81,6 +81,24 @@ Task<bool> tcp_server_test(){
   auto server = co_await start_tcp_server("0.0.0.0",9999,echo_server);
   co_await server.serve();
 }
+
+// Task<int> factorial(int n) {
+//     if (n <= 1) {
+//         co_await dump_callstack();
+//         co_return 1;
+//     }
+//     co_return (co_await factorial(n - 1)) * n;
+// }
+
+// int main() {
+//   auto& loop = EventLoop::get();
+//   mynet::create_task(factorial(10));
+//     // fmt::print("run result: {}\n", mynet::create_task(factorial(10)));
+//     loop.run();
+//     return 0;
+// }
+
+
 int main() {
   // {
   //   auto task = hello();
@@ -130,10 +148,10 @@ int main() {
   //   loop.run();
   // }
 
-  {
-    auto& loop = EventLoop::get();
-    mynet::create_task(tcp_server_test());
-    loop.run();
-  }
+  // {
+  //   auto& loop = EventLoop::get();
+  //   mynet::create_task(tcp_server_test());
+  //   loop.run();
+  // }
 
 }

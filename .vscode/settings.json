@@ -78,6 +78,7 @@
         "forward_list": "cpp",
         "typeindex": "cpp",
         "*.inc": "cpp",
-        "csignal": "cpp"
+        "csignal": "cpp",
+        "source_location": "cpp"
     }
 }

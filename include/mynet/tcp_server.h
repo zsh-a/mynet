@@ -2,7 +2,7 @@
 #include "fmt/color.h"
 #include "mynet/sockets.h"
 #include "mynet/task.h"
-
+#include <list>
 namespace mynet {
 
 template <typename Callback>
@@ -18,6 +18,7 @@ class TcpServer {
   Task<Connection> serve() {
     Event ev{.fd = fd_, .events = EPOLLIN};
     auto& loop = EventLoop::get();
+    std::list<Task<bool>> connections;
     while (1) {
       co_await loop.wait_event(ev);
       sockaddr_storage remote_addr{};
@@ -30,10 +31,9 @@ class TcpServer {
                            addr->sin_addr.s_addr >> 8 & 0xff,
                            addr->sin_addr.s_addr >> 16 & 0xff,
                            addr->sin_addr.s_addr >> 24 & 0xff);
-      fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
-                 "received connection from {}:{}\n", s, addr->sin_port);
+      log::Log(log::Info,"received connection from {}:{}", s, addr->sin_port);
       //   co_return Connection{client_fd};
-      mynet::create_task(cb_(Connection{client_fd, remote_addr}));
+      connections.push_back(mynet::create_task(cb_(Connection{client_fd, remote_addr})));
     }
   }
 

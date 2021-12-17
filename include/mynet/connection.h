@@ -32,7 +32,9 @@ public:
     tot_read = ::read(fd_, res.data(), size);
     if (tot_read < 0) {
       perror("read error");
-      exit(tot_read);
+      // exit(tot_read);
+      res.resize(0);
+      co_return res;
     }
     res.resize(tot_read);
     // fmt::print("tot_read read {} bytes\n",tot_read);
