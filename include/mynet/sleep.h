@@ -3,6 +3,7 @@
 #include "mynet/common.h"
 #include "mynet/event_loop.h"
 namespace mynet {
+// TODO: replace by timer
 struct Sleep {
   bool await_ready() { return false; }
   template <typename Promise>

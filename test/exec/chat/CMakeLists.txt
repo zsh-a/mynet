@@ -1,0 +1,5 @@
+add_executable(chat_server server.cc)
+add_executable(chat_client client.cc)
+# target_link_libraries(unit_test PRIVATE PRIVATE Catch2::Catch2 Catch2::Catch2WithMain mynet)
+target_link_libraries(chat_server PRIVATE fmt::fmt mynet)
+target_link_libraries(chat_client PRIVATE fmt::fmt mynet)

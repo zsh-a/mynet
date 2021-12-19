@@ -94,6 +94,10 @@ struct Task {
     if(handle_.done()) handle_.destroy();
   }
 
+  // Task(Task&& other) noexcept: handle_(std::exchange(other.handle_, {})) {
+  //   printf("aaaa\n");
+  // }
+
   bool done() { return handle_.done(); }
   void resume() { handle_.resume(); }
   R&& get_result() { return std::move(handle_.promise().value_).value(); }
@@ -126,8 +130,8 @@ struct NoWaitTask {
 
   };
 
-  std::unique_ptr<Resumable> get_resumable() {
-    return std::make_unique<CoResumable>(handle_);
+  Resumable* get_resumable() {
+    return &handle_.promise();
   }
 
   NoWaitTask(const auto& handle) : handle_(handle) {}
@@ -140,10 +144,10 @@ struct NoWaitTask {
 };
 
 template<typename Task>
-auto create_task(Task&& task){
+Task create_task(Task&& task){
   auto& loop = EventLoop::get();
   loop.run_immediately(task.get_resumable());
-  return std::forward<Task>(task);
+  return task;
 }
 
 }  // namespace mynet

@@ -30,6 +30,11 @@ Task<bool> client(){
     // fmt::print("receiving data {}\n",buf.data());
     if(!co_await conn.write(buf)) break; 
   }
+  conn.shutdown_write();
+  // do{
+    // auto buf = co_await conn.read(block_size);
+    // tot += buf.size();
+  // }while(buf.size() != 0);
   fmt::print("read {} bytes\n",tot);
   co_return true;
 }

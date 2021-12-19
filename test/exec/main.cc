@@ -65,12 +65,12 @@ Task<bool> conn_test(){
   co_return true;
 }
 
-Task<bool> echo_server(Connection conn){
+Task<bool> echo_server(Connection::Ptr conn){
   while(1){
-    auto buf = co_await conn.read(16* 1024);
+    auto buf = co_await conn->read(16* 1024);
     if(buf.size() == 0) break;
     fmt::print("receiving data {}\n",buf.data());
-    if(!co_await conn.write(buf)) break; 
+    if(!co_await conn->write(buf)) break; 
   }
   co_return true;
 }
@@ -78,7 +78,7 @@ Task<bool> echo_server(Connection conn){
 
 Task<bool> tcp_server_test(){
   Connection::Buffer buf{'h','e','l','l','o','\n'};
-  auto server = co_await start_tcp_server("0.0.0.0",9999,echo_server);
+  auto server = co_await start_tcp_server("0.0.0.0",9999,echo_server,"tcp server");
   co_await server.serve();
 }
 

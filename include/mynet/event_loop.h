@@ -9,6 +9,7 @@
 #include "mynet/resumable.h"
 #include "fmt/format.h"
 namespace mynet {
+class Channel;
 using namespace std::chrono;
 using TimeDuration = milliseconds;
 using Poller = Epoller;
@@ -29,6 +30,10 @@ class EventLoop : private NonCopyable {
   static EventLoop& get() {
     static EventLoop loop;
     return loop;
+  }
+
+  void update_channel(Channel* channel){
+    poller_.update_channel(channel);
   }
 
   TimeDuration::rep time() {
@@ -60,9 +65,6 @@ class EventLoop : private NonCopyable {
   void run() {
     while (schedule_.size() || ready_.size() || !poller_.is_stop()) {
       run_once();
-      // auto now = system_clock::now();
-      // auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
-      // if (time - start_time_ >= 5000) break;
     }
   }
 
@@ -70,54 +72,7 @@ class EventLoop : private NonCopyable {
     pop_heap(schedule_.begin(), schedule_.end());
     schedule_.pop_back();
   }
-  void run_once() {
-    // TimeDuration::rep timeout{0};
-
-    int timeout = -1;
-    if(ready_.size()) timeout = 0;
-    else timeout = 5000;
-    auto events = poller_.poll(timeout);
-    // fmt::print("{} events happened {} \n",events.size(),system_clock::now().time_since_epoch().count());
-
-    for(const auto& e : events){
-      ready_.push(reinterpret_cast<Resumable*>(e.ptr));
-    }
-    while (ready_.size()) {
-      auto handle = ready_.front();
-      ready_.pop();
-      handle->resume();
-    }
-
-    while (schedule_.size()) {
-      auto now = system_clock::now();
-      auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
-      auto&& [when, task] = schedule_[0];
-      if (time >= when) {
-        while (!task->done()) task->resume();
-        pop_schedule();
-      } else
-        break;
-
-      //   timeout = when;
-    }
-  }
-
-  struct AwaiterEvent{
-    bool await_ready() { return false; }
-    template<typename Promise>
-    void await_suspend(std::coroutine_handle<Promise> h) {
-      event_.ptr = &h.promise();
-      poller_.register_event(event_);
-    }
-    constexpr void await_resume() const noexcept {}
-    void await_resume() { poller_.remove_event(event_); }
-    Event event_;
-    Poller& poller_;
-  };
-
-  auto wait_event(const Event& event){
-    return AwaiterEvent{event,poller_};
-  }
+  void run_once();
 
 };
 

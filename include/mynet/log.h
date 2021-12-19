@@ -9,7 +9,7 @@ namespace log {
 
 enum Level { Error, Warning, Info };
 constexpr std::string_view LEVEL_NAME[] = {"error", "warning", "info"};
-Level g_level = Info;
+constexpr Level g_level = Info;
 
 struct Format {
   std::string_view fmt;
@@ -30,6 +30,10 @@ void Log(Level level, Format fmt, const auto&... args) {
                            fmt.loc.line()),
                fmt::vformat(fmt.fmt, fmt::v8::make_format_args(args...)));
 }
+
+// void Log_Info(Format fmt, const auto&... args) {
+//   Log(Info,fmt,args...);
+// }
 
 }  // namespace log
 }  // namespace mynet

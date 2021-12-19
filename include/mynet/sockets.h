@@ -17,10 +17,9 @@ Task<bool> connect(int fd, const sockaddr* addr, socklen_t len) noexcept {
     perror("exception happened");
     exit(errno);
   }
-
+  Channel channel(fd);
   auto& loop = EventLoop::get();
-  Event ev{.fd = fd, .events = EPOLLOUT};
-  co_await loop.wait_event(ev);
+  co_await channel.write(&loop);
   int result{0};
   socklen_t result_len = sizeof(result);
   if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &result, &result_len) < 0) {
@@ -70,7 +69,7 @@ Task<Connection> open_connection(std::string_view ip, int port) {
     exit(fd);
   }
 
-  co_return Connection{fd};
+  co_return Connection{fd,fmt::format("client:{}:{}",ip,port)};
 }
 
 }  // namespace mynet

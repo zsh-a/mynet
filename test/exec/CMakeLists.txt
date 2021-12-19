@@ -9,3 +9,4 @@ target_link_libraries(main PRIVATE fmt::fmt mynet)
 target_link_libraries(tcp_client PRIVATE fmt::fmt mynet)
 
 add_subdirectory(pingpong)
+add_subdirectory(chat)
