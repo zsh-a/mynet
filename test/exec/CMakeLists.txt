@@ -10,3 +10,5 @@ target_link_libraries(tcp_client PRIVATE fmt::fmt mynet)
 
 add_subdirectory(pingpong)
 add_subdirectory(chat)
+add_subdirectory(roundtrip)
+add_subdirectory(relay)

@@ -11,6 +11,8 @@
 #include "mynet/task.h"
 #include "mynet/sockets.h"
 #include "mynet/tcp_server.h"
+
+#include "codec.h"
 #include "fmt/os.h"
 using namespace std;
 using namespace mynet;
@@ -21,23 +23,16 @@ Connection::Buffer buf(block_size);
 
 Task<bool> chat(Connection::Ptr conn,std::map<std::string,Connection::Ptr>& peers){
   while(1){
-    auto buf = co_await conn->read(4);
-    auto head = buf;
-    if(buf.size() == 0) break;
-    auto n32 =  *reinterpret_cast<uint32_t*>(buf.data());
-    auto msg_len = ntohl(n32);
-    if(msg_len > 0xffff){
-      log::Log(log::Error,"invalid length {}",msg_len);
+    auto [state,msg] =  co_await decode(conn);
+    if(state == State::DISCONNECTED) {
       conn->shutdown_write();
       break;
     }
-
-    buf = co_await conn->read(msg_len);
-    head.insert(head.end(),buf.begin(),buf.end());
+    auto buf = encode(msg);
     for(auto&& [name,conn]:peers){
-      co_await conn->write(head);
+      co_await conn->write(buf);
     }
-    log::Log(log::Info,"from {} : message {}. length : {}",conn->name(),string(buf.begin(),buf.end()),msg_len);
+    log::Log(log::Info,"from {} : message {}. length : {}",conn->name(),msg,msg.size());
   }
   log::Log(log::Info,"user : {} leave",conn->name());
   peers.erase(conn->name());

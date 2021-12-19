@@ -3,6 +3,7 @@
 #include "mynet/task.h"
 #include "mynet/channel.h"
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 namespace mynet {
 
 class Connection : NonCopyable {
@@ -35,6 +36,13 @@ public:
                           addr->sin_addr.s_addr >> 8 & 0xff,
                           addr->sin_addr.s_addr >> 16 & 0xff,
                           addr->sin_addr.s_addr >> 24 & 0xff,addr->sin_port);
+  }
+  Channel* channel(){return &channel_;}
+
+  void set_tcp_no_delay(bool on){
+    int optval = on ? 1 : 0;
+    ::setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY,
+               &optval, static_cast<socklen_t>(sizeof optval));
   }
 
   auto name(){

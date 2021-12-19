@@ -1,0 +1,7 @@
+add_executable(rtt_server server.cc)
+add_executable(rtt_client client.cc)
+# target_link_libraries(unit_test PRIVATE PRIVATE Catch2::Catch2 Catch2::Catch2WithMain mynet)
+# target_link_options(rtt_server PRIVATE "-static" "-static-libgcc" "-static-libstdc++")
+find_package(fmt CONFIG REQUIRED)
+target_link_libraries(rtt_server PRIVATE fmt::fmt-header-only mynet)
+target_link_libraries(rtt_client PRIVATE fmt::fmt-header-only mynet)

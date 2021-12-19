@@ -10,6 +10,7 @@ add_library(${PROJECT_NAME} src/event_loop.cc src/epoller.cc src/connection.cc)
 target_include_directories(${PROJECT_NAME}
   PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_link_libraries(${PROJECT_NAME} PRIVATE fmt::fmt-header-only)
 
 # find_package(Catch2 CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)

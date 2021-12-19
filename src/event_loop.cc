@@ -1,18 +1,19 @@
 #include "mynet/event_loop.h"
+
 #include "mynet/channel.h"
 namespace mynet {
 
 void EventLoop::run_once() {
-  // TimeDuration::rep timeout{0};
+  TimeDuration timeout{0};
 
-  int timeout = -1;
   if (ready_.size())
-    timeout = 0;
-  else
-    timeout = 5000;
-  auto events = poller_.poll(timeout);
-  // fmt::print("{} events happened {}
-  // \n",events.size(),system_clock::now().time_since_epoch().count());
+    timeout = TimeDuration{0};
+  else if (schedule_.size()) {
+    timeout = schedule_.front().first - time();
+  } else
+    timeout = TimeDuration{5000};
+  auto events = poller_.poll(timeout.count());
+  auto now = duration_cast<microseconds>(system_clock::now().time_since_epoch());
 
   for (const auto& e : events) {
     Channel* channel = reinterpret_cast<Channel*>(e.ptr);
@@ -33,25 +34,25 @@ void EventLoop::run_once() {
     if (revents & EPOLLOUT) {
       ready_.emplace(channel->resume_write());
     }
+    channel->set_event_time(now);
   }
+
+  auto end_time = time();
+  while (schedule_.size()) {
+    auto&& [when, task] = schedule_[0];
+    if (when <= end_time) {
+      ready_.push(task);
+      pop_schedule();
+    } else
+      break;
+  }
+
   while (ready_.size()) {
     auto handle = ready_.front();
     ready_.pop();
     handle->resume();
   }
-
-  while (schedule_.size()) {
-    auto now = system_clock::now();
-    auto time = duration_cast<TimeDuration>(now.time_since_epoch()).count();
-    auto&& [when, task] = schedule_[0];
-    if (time >= when) {
-      while (!task->done()) task->resume();
-      pop_schedule();
-    } else
-      break;
-
-    //   timeout = when;
-  }
+  
 }
 
 }  // namespace mynet

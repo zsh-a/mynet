@@ -1,7 +1,7 @@
 
 // #define CATCH_CONFIG_MAIN
 #include <iostream>
-
+#include<chrono>
 #include "gtest/gtest.h"
 #include "mynet/add.h"
 #include "mynet/event_loop.h"
@@ -21,15 +21,30 @@ TEST(hello, world) {
 
 TEST(epoll, timeout) {
   using namespace mynet;
+  using namespace std::chrono;
   Epoller epoller;
   auto& loop = EventLoop::get();
   auto start = loop.time();
   epoller.poll(500);
   auto end = loop.time();
-  EXPECT_TRUE(end - start >= 500);
+  EXPECT_TRUE(end - start >= milliseconds{500});
 }
 
 using namespace mynet;
+
+Task<bool> sleep2s(){
+  co_await mynet::sleep(std::chrono::milliseconds(2000));
+}
+
+TEST(task, sleep) {
+  using namespace mynet;
+  auto& loop = EventLoop::get();
+  auto start = loop.time();
+  mynet::create_task(sleep2s());
+  loop.run();
+  auto end = loop.time();
+  EXPECT_TRUE(end - start >=  milliseconds{2000});
+}
 
 Task<int> many_resume(){
   co_await std::suspend_always{};

@@ -23,14 +23,14 @@ using namespace mynet;
 Task<std::string> hello() {
   fmt::print("enter hello\n");
 
-  co_await mynet::sleep(2000);
+  co_await mynet::sleep(chrono::milliseconds(1000));
   fmt::print("leave hello\n");
   co_return "hello";
 }
 
 Task<std::string> world() {
   fmt::print("enter world\n");
-  co_await mynet::sleep(1000);
+  co_await mynet::sleep(chrono::milliseconds(1000));
   fmt::print("leave world\n");
   co_return "world";
 }
@@ -48,7 +48,7 @@ Task<std::string> helloworld() {
 // }
 
 NoWaitTask<> run_sleep() {
-  co_await mynet::sleep(2000);
+  co_await mynet::sleep(chrono::milliseconds(2000));
   fmt::print("timeout\n");
 }
 

@@ -12,6 +12,7 @@
 #include "mynet/sockets.h"
 #include "mynet/task.h"
 #include "mynet/tcp_server.h"
+#include "codec.h"
 using namespace std;
 using namespace mynet;
 
@@ -34,18 +35,12 @@ Task<bool> send(Connection::Ptr conn){
 
 Task<bool> recv(Connection::Ptr conn){
   while (1) {
-    auto buf = co_await conn->read(4);
-    // fmt::print("receive msg len : {}\n",buf.size());
-    if(buf.size() == 0) break;
-    auto n32 =  *reinterpret_cast<uint32_t*>(buf.data());
-    auto msg_len = ntohl(n32);
-    if(msg_len > 0xffff){
-      log::Log(log::Error,"invalid length {}",msg_len);
+    auto [state,msg] =  co_await decode(conn);
+    if(state == State::DISCONNECTED){
       conn->shutdown_write();
       break;
     }
-    buf = co_await conn->read(msg_len);
-    fmt::print("received boardcast : {}\n",string(buf.begin(),buf.end()));
+    fmt::print("received boardcast : {}\n",msg);
   }
 }
 

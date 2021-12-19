@@ -4,6 +4,7 @@
 #include "mynet/event_loop.h"
 namespace mynet {
 // TODO: replace by timer
+template<typename Duration>
 struct Sleep {
   bool await_ready() { return false; }
   template <typename Promise>
@@ -12,8 +13,9 @@ struct Sleep {
     loop.run_delay(delay_, &h.promise());
   }
   void await_resume() const noexcept {}
-  TimeDuration::rep delay_;
+  Duration delay_;
 };
-auto sleep(TimeDuration::rep delay) { return Sleep{delay}; }
+template<typename Rep, typename Period>
+auto sleep(std::chrono::duration<Rep, Period> delay) { return Sleep{delay}; }
 
 }  // namespace mynet
