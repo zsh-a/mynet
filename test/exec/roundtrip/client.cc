@@ -16,13 +16,13 @@ using namespace std;
 using namespace mynet;
 
 Task<bool> client(){
-  auto conn = co_await mynet::open_connection("192.3.127.120",9999);
+  auto conn = co_await mynet::open_connection("0.0.0.0",9999);
   Connection::Buffer buf(16);
   while(1){
     auto now = duration_cast<chrono::microseconds>(chrono::system_clock::now().time_since_epoch()).count();
     memcpy(buf.data(),&now,sizeof now);
     co_await conn.write(buf);
-    auto recv_buf = co_await conn.read(16);
+    auto recv_buf = co_await conn.readn(16);
     int64_t message[2]{};
     memcpy(message,recv_buf.data(),16);
     int64_t send = message[0];

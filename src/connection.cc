@@ -3,6 +3,22 @@
 namespace mynet {
 Task<Connection::Buffer> Connection::read(ssize_t size) {
   if (size < 0) co_return co_await read_until_eof();
+  Buffer res(size);
+  auto& loop = EventLoop::get();
+  co_await channel_.read(&loop);
+  ssize_t tot_read = ::read(fd_, res.data(), size);
+  if (tot_read < 0) {
+    perror("read error");
+    // exit(tot_read);
+    res.resize(0);
+    co_return res;
+  }
+  res.resize(tot_read);
+  co_return res;
+}
+
+Task<Connection::Buffer> Connection::readn(ssize_t size) {
+  if (size < 0) co_return co_await read_until_eof();
   ssize_t tot_read = 0;
   Buffer res(size);
   auto& loop = EventLoop::get();
@@ -22,6 +38,7 @@ Task<Connection::Buffer> Connection::read(ssize_t size) {
   // fmt::print("tot_read read {} bytes\n",tot_read);
   co_return res;
 }
+
 Task<bool> Connection::write(const Buffer& buf) {
   ssize_t tot_writen = 0;
   auto& loop = EventLoop::get();

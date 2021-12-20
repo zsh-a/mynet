@@ -17,7 +17,7 @@ using namespace mynet;
 
 Task<bool> rtt_server(Connection::Ptr conn){
   while(1){
-    auto buf = co_await conn->read(16);
+    auto buf = co_await conn->readn(16);
     if(buf.size() == 0) {
       break;
     }

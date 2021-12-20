@@ -27,6 +27,7 @@ public:
   }
 
   Task<Buffer> read(ssize_t size = -1);
+  Task<Buffer> readn(ssize_t size);
   Task<bool> write(const Buffer& buf);
   Task<Buffer> read_until_eof();
 
