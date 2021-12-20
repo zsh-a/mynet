@@ -1,0 +1,5 @@
+add_executable(tinyhttp_server server.cc)
+# target_link_libraries(unit_test PRIVATE PRIVATE Catch2::Catch2 Catch2::Catch2WithMain mynet)
+# target_link_options(rtt_server PRIVATE "-static" "-static-libgcc" "-static-libstdc++")
+find_package(fmt CONFIG REQUIRED)
+target_link_libraries(tinyhttp_server PRIVATE fmt::fmt-header-only mynet)
