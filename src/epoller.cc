@@ -10,7 +10,7 @@ void Epoller::update_channel(Channel* channel) {
 
   if (it != channels_.end()) {
     if (channel->is_none()) {
-      --num_registered;
+      --num_registered_;
       ::epoll_ctl(fd_, EPOLL_CTL_DEL, channel->fd(), nullptr);
       channels_.erase(it);
     } else {
@@ -18,7 +18,7 @@ void Epoller::update_channel(Channel* channel) {
     }
   } else {
     channels_[channel->fd()] = channel;
-    ++num_registered;
+    ++num_registered_;
     if (int ret = ::epoll_ctl(fd_, EPOLL_CTL_ADD, channel->fd(), &event);
         ret != 0) {
       perror("add failed");
@@ -28,8 +28,8 @@ void Epoller::update_channel(Channel* channel) {
 }
 
 std::vector<Event> Epoller::poll(int timeout) {
-  std::vector<epoll_event> events(10);
-  int num_fds = epoll_wait(fd_, events.data(), 10, timeout);
+  std::vector<epoll_event> events(num_registered_);
+  int num_fds = epoll_wait(fd_, events.data(), num_registered_, timeout);
   if(num_fds < 0 ){
     perror("epoll");
     return {};

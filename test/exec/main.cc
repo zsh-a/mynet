@@ -67,9 +67,9 @@ Task<bool> conn_test(){
 
 Task<bool> echo_server(Connection::Ptr conn){
   while(1){
-    auto buf = co_await conn->read(16* 1024);
+    auto buf = co_await conn->read(4* 1024);
     if(buf.size() == 0) break;
-    fmt::print("receiving data {}\n",buf.data());
+    // fmt::print("receiving data {}\n",buf.data());
     if(!co_await conn->write(buf)) break; 
   }
   co_return true;
@@ -148,10 +148,10 @@ int main() {
   //   loop.run();
   // }
 
-  // {
-  //   auto& loop = EventLoop::get();
-  //   mynet::create_task(tcp_server_test());
-  //   loop.run();
-  // }
+  {
+    auto& loop = EventLoop::get();
+    mynet::create_task(tcp_server_test());
+    loop.run();
+  }
 
 }

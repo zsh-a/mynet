@@ -4,7 +4,7 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 #include "event.h"
@@ -14,8 +14,8 @@ class Channel;
 class Epoller {
  public:
   int fd_;
-  int num_registered{0};
-  std::map<int, Channel*> channels_;
+  int num_registered_{1};
+  std::unordered_map<int, Channel*> channels_;
 
  public:
   Epoller() : fd_(epoll_create1(0)) {
@@ -25,7 +25,7 @@ class Epoller {
     }
   }
 
-  bool is_stop() { return num_registered <= 0; }
+  bool is_stop() { return num_registered_ <= 1; }
 
   std::vector<Event> poll(int timeout);
 

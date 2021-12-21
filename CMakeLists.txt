@@ -6,7 +6,7 @@ project(mynet)
 # Create the executable
 set(CMAKE_CXX_STANDARD 20)
 
-add_library(${PROJECT_NAME} src/event_loop.cc src/epoller.cc src/connection.cc)
+add_library(${PROJECT_NAME} src/event_loop.cc src/epoller.cc src/connection.cc src/log.cc)
 target_include_directories(${PROJECT_NAME}
   PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

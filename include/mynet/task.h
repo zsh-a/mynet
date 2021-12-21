@@ -144,10 +144,10 @@ struct NoWaitTask {
 };
 
 template<typename Task>
-Task create_task(Task&& task){
+auto create_task(Task&& task){
   auto& loop = EventLoop::get();
   loop.run_immediately(task.get_resumable());
-  return task;
+  return std::forward<Task>(task);
 }
 
 }  // namespace mynet

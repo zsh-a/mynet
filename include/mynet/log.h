@@ -9,7 +9,8 @@ namespace log {
 
 enum Level { Error, Warning, Info };
 constexpr std::string_view LEVEL_NAME[] = {"error", "warning", "info"};
-constexpr Level g_level = Info;
+
+extern Level g_level;
 
 struct Format {
   std::string_view fmt;
