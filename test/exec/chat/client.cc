@@ -28,13 +28,13 @@ Task<bool> send(Connection::Ptr conn) {
     auto n32 = htonl(msg_len);
     memcpy(buf.data(), &n32, 4);
     for (int i = 0; i < msg_len; i++) buf[i + 4] = msg[i];
-    co_await conn->write(buf);
+    co_await conn->write(buf)(conn->loop_);
   }
 }
 
 Task<bool> recv(Connection::Ptr conn) {
   while (1) {
-    auto [state, msg] = co_await decode(conn);
+    auto [state, msg] = co_await decode(conn)(conn->loop_);
     if (state == State::DISCONNECTED) {
       conn->shutdown_write();
       break;
@@ -44,7 +44,7 @@ Task<bool> recv(Connection::Ptr conn) {
 }
 
 Task<bool> client() {
-  auto conn = co_await mynet::open_connection(&g_loop,"127.0.0.1", 9999);
+  auto conn = co_await mynet::open_connection(&g_loop,"127.0.0.1", 9999)(&g_loop);;
   auto ptr = make_shared<Connection>(std::move(conn));
   g_loop.create_task(send(ptr));
   g_loop.create_task(recv(ptr));

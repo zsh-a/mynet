@@ -90,7 +90,7 @@ Connection::Buffer to_buffer(HttpResponse resp) {
 }
 
 Task<bool> http(Connection::Ptr conn) {
-  auto buf = co_await conn->read(1024);
+  auto buf = co_await conn->read(1024)(conn->loop_);
   auto req = parse(std::move(buf));
   // fmt::print("{} \n", req.url_);
   // for (auto&& [k, v] : req.headers_) {
@@ -107,7 +107,7 @@ Task<bool> http(Connection::Ptr conn) {
   resp.headers_["Content-Length"] = to_string(msg.size());
 
   buf = to_buffer(std::move(resp));
-  co_await conn->write(buf);
+  co_await conn->write(buf)(conn->loop_);
   conn->shutdown_write();
 
   co_return true;
@@ -115,8 +115,8 @@ Task<bool> http(Connection::Ptr conn) {
 
 Task<bool> http_server_test() {
   auto server =
-      co_await start_tcp_server(&g_loop,"0.0.0.0", 8080, http, "tinyhttp_server");
-  co_await server.serve();
+      co_await start_tcp_server(&g_loop,"0.0.0.0", 8080, http, "tinyhttp_server")(&g_loop);
+  co_await server.serve()(&g_loop);
 }
 
 int main() {

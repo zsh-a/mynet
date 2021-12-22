@@ -17,27 +17,27 @@ EventLoop g_loop;
 
 Task<bool> tunnel(Connection::Ptr client, Connection::Ptr server) {
   while (1) {
-    auto buf = co_await client->read(16 * 1024);
+    auto buf = co_await client->read(16 * 1024)(client->loop_);
     if (buf.size() == 0) {
       break;
     }
-    co_await server->write(buf);
+    co_await server->write(buf)(server->loop_);
   }
   server->shutdown_write();
 }
 
 Task<bool> relay(Connection::Ptr conn) {
-  auto server = co_await open_connection(&g_loop,"0.0.0.0", 3000);
+  auto server = co_await open_connection(&g_loop,"0.0.0.0", 3000)(conn->loop_);
   auto ptr = make_shared<Connection>(std::move(server));
-  g_loop.create_task(tunnel(conn, ptr));
-  g_loop.create_task(tunnel(ptr, conn));
+  conn->loop_->create_task(tunnel(conn, ptr));
+  conn->loop_->create_task(tunnel(ptr, conn));
   co_return true;
 }
 
 Task<bool> relay_server_test() {
   auto server = co_await start_tcp_server(&g_loop, "0.0.0.0", 9999, relay,
-                                          "relay_server");
-  co_await server.serve();
+                                          "relay_server")(&g_loop);
+  co_await server.serve()(&g_loop);
 }
 
 int main() {

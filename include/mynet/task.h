@@ -13,7 +13,7 @@ struct Task {
   using coro_handle = std::coroutine_handle<promise_type>;
 
   struct promise_type : public Resumable {
-    Task get_return_object() { return Task(coro_handle::from_promise(*this)); }
+    Task get_return_object() { return Task{coro_handle::from_promise(*this)}; }
 
     std::suspend_always initial_suspend() { return {}; }
     struct final_awaiter {
@@ -64,14 +64,24 @@ struct Task {
     EventLoop* loop_;
   };
 
-  auto operator co_await() { return Awaiter{handle_}; }
+  auto operator co_await() {
+    assert(handle_.promise().loop_ != nullptr);
+    return Awaiter{handle_, handle_.promise().loop_};
+  }
 
   Resumable* get_resumable() { return &handle_.promise(); }
 
-  // Task(const auto& handle) : handle_(handle) {}
+  auto& operator()(EventLoop* loop) {
+    handle_.promise().loop_ = loop;
+    return *this;
+  }
 
+  // Task(const auto& handle) : handle_(handle) {}
+  Task() = default;
+  explicit Task(coro_handle h) noexcept: handle_(h) {}
+  Task(Task&& t) noexcept : handle_(std::exchange(t.handle_, {})) {}
   ~Task() {
-    if (handle_.done()) handle_.destroy();
+    if (handle_ && handle_.done()) handle_.destroy();
   }
 
   // Task(Task&& other) noexcept: handle_(std::exchange(other.handle_, {})) {

@@ -57,7 +57,7 @@ Task<Connection> open_connection(EventLoop* loop, std::string_view ip,
     if ((fd = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK,
                      p->ai_protocol)) == 1)
       continue;
-    if ((co_await internel::connect(loop, fd, p->ai_addr, p->ai_addrlen))) {
+    if ((co_await internel::connect(loop, fd, p->ai_addr, p->ai_addrlen)(loop))) {
       break;
     }
     fmt::print("connect to {}:{} failed, retrying\n", p->ai_addr->sa_data,

@@ -70,21 +70,21 @@ Task<Dummy> coro1(std::vector<int>& result) {
 
 Task<Dummy> coro2(std::vector<int>& result) {
   result.push_back(2);
-  co_await coro1(result);
+  co_await coro1(result)(&g_loop);
   result.push_back(20);
   co_return Dummy{};
 }
 
 Task<Dummy> coro3(std::vector<int>& result) {
   result.push_back(3);
-  co_await coro2(result);
+  co_await coro2(result)(&g_loop);
   result.push_back(30);
   co_return Dummy{};
 }
 
 Task<Dummy> coro4(std::vector<int>& result) {
   result.push_back(4);
-  co_await coro3(result);
+  co_await coro3(result)(&g_loop);
   result.push_back(40);
   co_return Dummy{};
 }
@@ -115,19 +115,19 @@ TEST_F(TaskAwaitTest, task) {
 
 TEST_F(TaskAwaitTest, task2) {
   std::vector<int> expected{2,1,20};
-  g_loop.run_until_done(coro2(result).get_resumable());
+  g_loop.run_until_done(coro2(result)(&g_loop).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
 TEST_F(TaskAwaitTest, task3) {
   std::vector<int> expected{3,2,1,20,30};
-  g_loop.run_until_done(coro3(result).get_resumable());
+  g_loop.run_until_done(coro3(result)(&g_loop).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
 TEST_F(TaskAwaitTest, task4) {
   std::vector<int> expected{4,3,2,1,20,30,40};
-  g_loop.run_until_done(coro4(result).get_resumable());
+  g_loop.run_until_done(coro4(result)(&g_loop).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
@@ -136,13 +136,12 @@ Task<int> mul(int a,int b){
 }
 
 Task<int> get_await_result(){
-  auto a = co_await mul(2,3);
-  auto b = co_await mul(4,5);
+  auto a = co_await mul(2,3)(&g_loop);
+  auto b = co_await mul(4,5)(&g_loop);
   co_return a + b;
 }
 
 TEST(task, get_await_result) {
-  using namespace mynet;
   auto g = get_await_result();
   g_loop.run_until_done(g.get_resumable());
   EXPECT_EQ(g.get_result(),26);
@@ -150,19 +149,19 @@ TEST(task, get_await_result) {
 
 Task<int> fibo(int n){
   if(n <= 1) co_return n;
-  co_return co_await fibo(n - 1) + co_await fibo(n - 2);
+  auto x = co_await fibo(n - 1)(&g_loop);
+  x += co_await fibo(n - 2)(&g_loop);
+  co_return x;
 }
 
 TEST(task, fibo3) {
-  using namespace mynet;
-  auto g = fibo(3);
+  auto& g = fibo(3)(&g_loop);
   g_loop.run_until_done(g.get_resumable());
   EXPECT_EQ(g.get_result(),2);
 }
 
 TEST(task, fibo7) {
-  using namespace mynet;
-  auto g = fibo(8);
+  auto& g = fibo(8)(&g_loop);
   g_loop.run_until_done(g.get_resumable());
   EXPECT_EQ(g.get_result(),21);
 }

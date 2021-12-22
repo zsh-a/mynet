@@ -48,6 +48,7 @@ class EventLoop : private NonCopyable {
   // }
   template <typename Task>
   auto create_task(Task&& task) {
+    task.handle_.promise().loop_ = this;
     run_immediately(task.get_resumable());
     return std::forward<Task>(task);
   }
