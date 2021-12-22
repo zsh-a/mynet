@@ -4,8 +4,7 @@ namespace mynet {
 Task<Connection::Buffer> Connection::read(ssize_t size) {
   if (size < 0) co_return co_await read_until_eof();
   Buffer res(size);
-  auto& loop = EventLoop::get();
-  co_await channel_.read(&loop);
+  co_await channel_.read(loop_);
   ssize_t tot_read = ::read(fd_, res.data(), size);
   if (tot_read < 0) {
     perror("read error");
@@ -21,9 +20,8 @@ Task<Connection::Buffer> Connection::readn(ssize_t size) {
   if (size < 0) co_return co_await read_until_eof();
   ssize_t tot_read = 0;
   Buffer res(size);
-  auto& loop = EventLoop::get();
   while (tot_read < size) {
-    co_await channel_.read(&loop);
+    co_await channel_.read(loop_);
     ssize_t ret = ::read(fd_, res.data() + tot_read, size - tot_read);
     if (ret == 0) break;
     if (ret < 0) {
@@ -41,9 +39,8 @@ Task<Connection::Buffer> Connection::readn(ssize_t size) {
 
 Task<bool> Connection::write(const Buffer& buf) {
   ssize_t tot_writen = 0;
-  auto& loop = EventLoop::get();
   while (tot_writen < buf.size()) {
-    co_await channel_.write(&loop);
+    co_await channel_.write(loop_);
     ssize_t writen =
         ::write(fd_, buf.data() + tot_writen, buf.size() - tot_writen);
     if (writen < 0) {
@@ -59,9 +56,8 @@ Task<bool> Connection::write(const Buffer& buf) {
 Task<Connection::Buffer> Connection::read_until_eof() {
   int tot_read = 0;
   Buffer res;
-  auto& loop = EventLoop::get();
   for (int cur_read = 0;;) {
-    co_await channel_.read(&loop);
+    co_await channel_.read(loop_);
     Buffer buf(BUFFER_SIZE);
     cur_read = ::read(fd_, buf.data(), BUFFER_SIZE);
     if (cur_read < 0) {

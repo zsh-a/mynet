@@ -79,6 +79,14 @@
         "typeindex": "cpp",
         "*.inc": "cpp",
         "csignal": "cpp",
-        "source_location": "cpp"
+        "source_location": "cpp",
+        "valarray": "cpp",
+        "csetjmp": "cpp",
+        "barrier": "cpp",
+        "charconv": "cpp",
+        "cuchar": "cpp",
+        "latch": "cpp",
+        "scoped_allocator": "cpp",
+        "syncstream": "cpp"
     }
 }

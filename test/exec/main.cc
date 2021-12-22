@@ -19,25 +19,25 @@ using namespace mynet;
 // IntGenerator gen() {
 //   for (int i = 0; i < 100; i++) co_yield i;
 // }
-
+EventLoop g_loop;
 Task<std::string> hello() {
   fmt::print("enter hello\n");
 
-  co_await mynet::sleep(chrono::milliseconds(1000));
+  co_await mynet::sleep(&g_loop,chrono::milliseconds(1000));
   fmt::print("leave hello\n");
   co_return "hello";
 }
 
 Task<std::string> world() {
   fmt::print("enter world\n");
-  co_await mynet::sleep(chrono::milliseconds(1000));
+  co_await mynet::sleep(&g_loop,chrono::milliseconds(1000));
   fmt::print("leave world\n");
   co_return "world";
 }
 
 Task<std::string> helloworld() {
-  auto h = mynet::create_task(hello());
-  auto w = mynet::create_task(world());
+  auto h = g_loop.create_task(hello());
+  auto w = g_loop.create_task(world());
   co_return fmt::format("{} {}", h.get_result(), w.get_result());
 }
 
@@ -48,12 +48,12 @@ Task<std::string> helloworld() {
 // }
 
 NoWaitTask<> run_sleep() {
-  co_await mynet::sleep(chrono::milliseconds(2000));
+  co_await mynet::sleep(&g_loop,chrono::milliseconds(2000));
   fmt::print("timeout\n");
 }
 
 Task<bool> conn_test(){
-  auto conn = co_await open_connection("127.0.0.1",8000);
+  auto conn = co_await open_connection(&g_loop,"127.0.0.1",8000);
   // co_await mynet::sleep(5000);
   // co_await mynet::sleep(10000);
   auto buf = co_await conn.read_until_eof();
@@ -78,7 +78,7 @@ Task<bool> echo_server(Connection::Ptr conn){
 
 Task<bool> tcp_server_test(){
   Connection::Buffer buf{'h','e','l','l','o','\n'};
-  auto server = co_await start_tcp_server("0.0.0.0",9999,echo_server,"tcp server");
+  auto server = co_await start_tcp_server(&g_loop,"0.0.0.0",9999,echo_server,"tcp server");
   co_await server.serve();
 }
 
@@ -149,9 +149,8 @@ int main() {
   // }
 
   {
-    auto& loop = EventLoop::get();
-    mynet::create_task(tcp_server_test());
-    loop.run();
+    g_loop.create_task(tcp_server_test());
+    g_loop.run();
   }
 
 }

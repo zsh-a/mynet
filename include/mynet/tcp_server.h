@@ -10,6 +10,8 @@ namespace mynet {
 
 template <typename Callback>
 class TcpServer {
+  EventLoop* loop_{nullptr};
+
   int fd_{-1};
   Channel channel_;
   std::string name_;
@@ -20,18 +22,23 @@ class TcpServer {
 
  public:
   static constexpr int DEFAULT_MAX_CONNECTIONS = 8;
-  TcpServer(int fd, std::string_view name, Callback cb)
-      : fd_(fd), channel_(fd), name_(name), cb_(std::forward<Callback>(cb)) {}
+  TcpServer(EventLoop* loop, int fd, std::string_view name, Callback cb)
+      : loop_(loop),
+        fd_(fd),
+        channel_(fd),
+        name_(name),
+        cb_(std::forward<Callback>(cb)) {}
   TcpServer(TcpServer&& other)
-      : fd_(std::exchange(other.fd_, -1)),
+      : loop_(other.loop_),
+        fd_(std::exchange(other.fd_, -1)),
         channel_(other.channel_),
         name_(std::move(other.name_)),
         cb_(other.cb_) {}
+
   Task<Connection> serve() {
-    auto& loop = EventLoop::get();
     // std::list<Task<bool>> connections;
 
-    std::vector<Task<bool>> connected;
+    std::list<Task<bool>> connected;
 
     auto gc = [&]() {
       if (connected.size() < 100) [[likely]] {
@@ -46,7 +53,7 @@ class TcpServer {
       }
     };
     while (1) {
-      co_await channel_.read(&loop);
+      co_await channel_.read(loop_);
       sockaddr_storage remote_addr{};
       socklen_t sock_len = sizeof(remote_addr);
       int client_fd =
@@ -61,17 +68,16 @@ class TcpServer {
           fmt::format("{}-{}#{}", name_, ip_port, conn_id++);
       log::Log(log::Info, "received connection from {}", conn_name);
 
-      auto conn =
-          std::make_shared<Connection>(client_fd, remote_addr, conn_name);
-      connected.emplace_back(mynet::create_task(cb_(std::move(conn))));
+      auto conn = std::make_shared<Connection>(loop_, client_fd, remote_addr,
+                                               conn_name);
+      connected.emplace_back(loop_->create_task(cb_(std::move(conn))));
       gc();
       // connections_map_[conn_name] = conn;
     }
   }
 
-  Task<Connection::Ptr> accept() {
-    auto& loop = EventLoop::get();
-    co_await channel_.read(&loop);
+  Task<Connection::Ptr> accept(EventLoop* loop) {
+    co_await channel_.read(loop_);
     sockaddr_storage remote_addr{};
     socklen_t sock_len = sizeof(remote_addr);
     int client_fd =
@@ -89,7 +95,8 @@ class TcpServer {
     std::string conn_name = fmt::format("{}-{}#{}", name_, ip_port, conn_id++);
     log::Log(log::Info, "received connection from {}", conn_name);
 
-    auto conn = std::make_shared<Connection>(client_fd, remote_addr, conn_name);
+    auto conn =
+        std::make_shared<Connection>(loop, client_fd, remote_addr, conn_name);
     // connections_map_[conn_name] = conn;
     co_return conn;
   }
@@ -100,8 +107,9 @@ class TcpServer {
 };
 
 template <typename Callback>
-Task<TcpServer<Callback>> start_tcp_server(std::string_view ip, int port,
-                                           Callback cb, std::string_view name) {
+Task<TcpServer<Callback>> start_tcp_server(EventLoop* loop, std::string_view ip,
+                                           int port, Callback cb,
+                                           std::string_view name) {
   addrinfo hints{.ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM};
   addrinfo* server_info{nullptr};
   auto port_str = std::to_string(port);
@@ -137,7 +145,7 @@ Task<TcpServer<Callback>> start_tcp_server(std::string_view ip, int port,
     fmt::print("server listen failed {}\n", errno);
     exit(errno);
   }
-  co_return TcpServer{server_fd, name, cb};
+  co_return TcpServer{loop, server_fd, name, cb};
 }
 
 }  // namespace mynet

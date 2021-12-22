@@ -13,6 +13,8 @@
 // {
 //     REQUIRE( add(1,2) == 3 );
 // }
+using namespace mynet;
+EventLoop g_loop;
 
 TEST(hello, world) {
   EXPECT_EQ(add(2, 2), 4);
@@ -23,26 +25,22 @@ TEST(epoll, timeout) {
   using namespace mynet;
   using namespace std::chrono;
   Epoller epoller;
-  auto& loop = EventLoop::get();
-  auto start = loop.time();
+  auto start = g_loop.time();
   epoller.poll(500);
-  auto end = loop.time();
+  auto end = g_loop.time();
   EXPECT_TRUE(end - start >= milliseconds{500});
 }
 
-using namespace mynet;
-
 Task<bool> sleep2s(){
-  co_await mynet::sleep(std::chrono::milliseconds(2000));
+  co_await mynet::sleep(&g_loop,std::chrono::milliseconds(2000));
 }
 
 TEST(task, sleep) {
   using namespace mynet;
-  auto& loop = EventLoop::get();
-  auto start = loop.time();
-  mynet::create_task(sleep2s());
-  loop.run();
-  auto end = loop.time();
+  auto start = g_loop.time();
+  g_loop.create_task(sleep2s());
+  g_loop.run();
+  auto end = g_loop.time();
   EXPECT_TRUE(end - start >=  milliseconds{2000});
 }
 
@@ -117,22 +115,19 @@ TEST_F(TaskAwaitTest, task) {
 
 TEST_F(TaskAwaitTest, task2) {
   std::vector<int> expected{2,1,20};
-  auto& loop = EventLoop::get();
-  loop.run_until_done(coro2(result).get_resumable());
+  g_loop.run_until_done(coro2(result).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
 TEST_F(TaskAwaitTest, task3) {
   std::vector<int> expected{3,2,1,20,30};
-  auto& loop = EventLoop::get();
-  loop.run_until_done(coro3(result).get_resumable());
+  g_loop.run_until_done(coro3(result).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
 TEST_F(TaskAwaitTest, task4) {
   std::vector<int> expected{4,3,2,1,20,30,40};
-  auto& loop = EventLoop::get();
-  loop.run_until_done(coro4(result).get_resumable());
+  g_loop.run_until_done(coro4(result).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
@@ -148,9 +143,8 @@ Task<int> get_await_result(){
 
 TEST(task, get_await_result) {
   using namespace mynet;
-  auto& loop = EventLoop::get();
   auto g = get_await_result();
-  loop.run_until_done(g.get_resumable());
+  g_loop.run_until_done(g.get_resumable());
   EXPECT_EQ(g.get_result(),26);
 }
 
@@ -161,16 +155,14 @@ Task<int> fibo(int n){
 
 TEST(task, fibo3) {
   using namespace mynet;
-  auto& loop = EventLoop::get();
   auto g = fibo(3);
-  loop.run_until_done(g.get_resumable());
+  g_loop.run_until_done(g.get_resumable());
   EXPECT_EQ(g.get_result(),2);
 }
 
 TEST(task, fibo7) {
   using namespace mynet;
-  auto& loop = EventLoop::get();
   auto g = fibo(8);
-  loop.run_until_done(g.get_resumable());
+  g_loop.run_until_done(g.get_resumable());
   EXPECT_EQ(g.get_result(),21);
 }

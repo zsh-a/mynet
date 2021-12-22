@@ -6,24 +6,23 @@
 // #include "mynet/generator.h"
 #include <memory>
 
+#include "codec.h"
 #include "fmt/os.h"
 #include "mynet/event_loop.h"
 #include "mynet/sleep.h"
 #include "mynet/sockets.h"
 #include "mynet/task.h"
 #include "mynet/tcp_server.h"
-#include "codec.h"
 using namespace std;
 using namespace mynet;
 
-Task<bool> send(Connection::Ptr conn){
-
+EventLoop g_loop;
+Task<bool> send(Connection::Ptr conn) {
   Channel channel(0);
-  auto& loop = EventLoop::get(); 
   while (1) {
-    co_await channel.read(&loop);
+    co_await channel.read(&g_loop);
     char msg[128]{};
-    int msg_len = ::read(0,msg,sizeof msg);
+    int msg_len = ::read(0, msg, sizeof msg);
     --msg_len;
     auto buf = Connection::Buffer(4 + msg_len);
     auto n32 = htonl(msg_len);
@@ -33,30 +32,28 @@ Task<bool> send(Connection::Ptr conn){
   }
 }
 
-Task<bool> recv(Connection::Ptr conn){
+Task<bool> recv(Connection::Ptr conn) {
   while (1) {
-    auto [state,msg] =  co_await decode(conn);
-    if(state == State::DISCONNECTED){
+    auto [state, msg] = co_await decode(conn);
+    if (state == State::DISCONNECTED) {
       conn->shutdown_write();
       break;
     }
-    fmt::print("received boardcast : {}\n",msg);
+    fmt::print("received boardcast : {}\n", msg);
   }
 }
 
 Task<bool> client() {
-  auto conn = co_await mynet::open_connection("127.0.0.1", 9999);
+  auto conn = co_await mynet::open_connection(&g_loop,"127.0.0.1", 9999);
   auto ptr = make_shared<Connection>(std::move(conn));
-  mynet::create_task(send(ptr));
-  mynet::create_task(recv(ptr));
+  g_loop.create_task(send(ptr));
+  g_loop.create_task(recv(ptr));
   co_return true;
 }
 
 int main(int argc, char* argv[]) {
   {
-
-    auto& loop = EventLoop::get();
-    mynet::create_task(client());
-    loop.run();
+    g_loop.create_task(client());
+    g_loop.run();
   }
 }

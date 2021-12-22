@@ -2,6 +2,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <queue>
 
 #include "fmt/format.h"
@@ -19,6 +20,20 @@ class EventLoop : private NonCopyable {
   std::vector<TimerHandle> schedule_;  // heap
   Poller poller_;
 
+  mutable std::mutex mutex_;
+  std::vector<Resumable*> pending_tasks_;  // protected by mutex_
+
+  void run_pending_tasks() {
+    std::vector<Resumable*> tasks;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      tasks.swap(pending_tasks_);
+    }
+    for (auto taks : tasks) {
+      taks->resume();
+    }
+  }
+
  public:
   TimeDuration start_time_;
 
@@ -27,17 +42,28 @@ class EventLoop : private NonCopyable {
     start_time_ = duration_cast<TimeDuration>(now.time_since_epoch());
   }
 
-  static EventLoop& get() {
-    static EventLoop loop;
-    return loop;
+  // static EventLoop& get() {
+  //   static EventLoop loop;
+  //   return loop;
+  // }
+  template <typename Task>
+  auto create_task(Task&& task) {
+    run_immediately(task.get_resumable());
+    return std::forward<Task>(task);
+  }
+
+  void run_in_loop(Resumable* task) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      pending_tasks_.push_back(task);
+    }
   }
 
   void update_channel(Channel* channel) { poller_.update_channel(channel); }
 
   TimeDuration time() {
     auto now = system_clock::now();
-    return duration_cast<TimeDuration>(now.time_since_epoch()) -
-           start_time_;
+    return duration_cast<TimeDuration>(now.time_since_epoch()) - start_time_;
   }
 
   void run_immediately(Resumable* task) { ready_.emplace(task); }
@@ -50,7 +76,6 @@ class EventLoop : private NonCopyable {
 
   template <typename Rep, typename Period>
   void run_delay(std::chrono::duration<Rep, Period> delay, Resumable* task) {
-    auto now = system_clock::now();
     run_at(time() + duration_cast<TimeDuration>(delay), task);
   }
 

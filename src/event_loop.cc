@@ -13,7 +13,8 @@ void EventLoop::run_once() {
   } else
     timeout = TimeDuration{5000};
   auto events = poller_.poll(timeout.count());
-  auto now = duration_cast<microseconds>(system_clock::now().time_since_epoch());
+  auto now =
+      duration_cast<microseconds>(system_clock::now().time_since_epoch());
 
   for (const auto& e : events) {
     Channel* channel = reinterpret_cast<Channel*>(e.ptr);
@@ -52,7 +53,8 @@ void EventLoop::run_once() {
     ready_.pop();
     handle->resume();
   }
-  
+
+  run_pending_tasks();
 }
 
 }  // namespace mynet

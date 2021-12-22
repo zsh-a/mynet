@@ -15,6 +15,8 @@
 using namespace std;
 using namespace mynet;
 
+EventLoop g_loop;
+
 std::unordered_map<std::string, HttpRequest::Method> methods{
     {"GET", HttpRequest::Method::GET}, {"POST", HttpRequest::Method::POST}};
 
@@ -107,20 +109,19 @@ Task<bool> http(Connection::Ptr conn) {
   buf = to_buffer(std::move(resp));
   co_await conn->write(buf);
   conn->shutdown_write();
-  conn.reset();
+
   co_return true;
 }
 
 Task<bool> http_server_test() {
   auto server =
-      co_await start_tcp_server("0.0.0.0", 8080, http, "tinyhttp_server");
+      co_await start_tcp_server(&g_loop,"0.0.0.0", 8080, http, "tinyhttp_server");
   co_await server.serve();
 }
 
 int main() {
   {
-    auto& loop = EventLoop::get();
-    mynet::create_task(http_server_test());
-    loop.run();
+    g_loop.create_task(http_server_test());
+    g_loop.run();
   }
 }

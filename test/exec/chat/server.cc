@@ -20,6 +20,7 @@ using namespace mynet;
 int block_size = 16 * 1024;
 Connection::Buffer buf(block_size);
 
+EventLoop g_loop;
 
 Task<bool> chat(Connection::Ptr conn,std::map<std::string,Connection::Ptr>& peers){
   while(1){
@@ -42,18 +43,17 @@ Task<bool> chat(Connection::Ptr conn,std::map<std::string,Connection::Ptr>& peer
 Task<bool> chat_server(){
   std::map<std::string,Connection::Ptr> peers;
 
-  auto server = co_await start_tcp_server("0.0.0.0",9999,chat,"chat server");
+  auto server = co_await start_tcp_server(&g_loop,"0.0.0.0",9999,chat,"chat server");
   for(;;){
-    auto conn = co_await server.accept();
+    auto conn = co_await server.accept(&g_loop);
     peers[conn->name()] = conn;
-    mynet::create_task(chat(conn,peers));
+    g_loop.create_task(chat(conn,peers));
   }
 }
 
 int main() {
   {
-    auto& loop = EventLoop::get();
-    mynet::create_task(chat_server());
-    loop.run();
+    g_loop.create_task(chat_server());
+    g_loop.run();
   }
 }

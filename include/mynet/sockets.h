@@ -10,7 +10,8 @@
 namespace mynet {
 
 namespace internel {
-Task<bool> connect(int fd, const sockaddr* addr, socklen_t len) noexcept {
+Task<bool> connect(EventLoop* loop, int fd, const sockaddr* addr,
+                   socklen_t len) noexcept {
   int ret = ::connect(fd, addr, len);
   if (ret == 0) co_return true;
   if (ret < 0 && errno != EINPROGRESS) {
@@ -18,8 +19,7 @@ Task<bool> connect(int fd, const sockaddr* addr, socklen_t len) noexcept {
     exit(errno);
   }
   Channel channel(fd);
-  auto& loop = EventLoop::get();
-  co_await channel.write(&loop);
+  co_await channel.write(loop);
   int result{0};
   socklen_t result_len = sizeof(result);
   if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &result, &result_len) < 0) {
@@ -35,7 +35,8 @@ struct AddressInfo {
 };
 }  // namespace internel
 
-Task<Connection> open_connection(std::string_view ip, int port) {
+Task<Connection> open_connection(EventLoop* loop, std::string_view ip,
+                                 int port) {
   addrinfo hints{
       .ai_family = AF_UNSPEC,
       .ai_socktype = SOCK_STREAM,
@@ -56,11 +57,11 @@ Task<Connection> open_connection(std::string_view ip, int port) {
     if ((fd = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK,
                      p->ai_protocol)) == 1)
       continue;
-    if ((co_await internel::connect(fd, p->ai_addr, p->ai_addrlen))) {
+    if ((co_await internel::connect(loop, fd, p->ai_addr, p->ai_addrlen))) {
       break;
     }
-          fmt::print("connect to {}:{} failed, retrying\n", p->ai_addr->sa_data,
-                 port_str);
+    fmt::print("connect to {}:{} failed, retrying\n", p->ai_addr->sa_data,
+               port_str);
     ::close(fd);
   }
 
@@ -69,7 +70,7 @@ Task<Connection> open_connection(std::string_view ip, int port) {
     exit(fd);
   }
 
-  co_return Connection{fd,fmt::format("client:{}:{}",ip,port)};
+  co_return Connection{loop, fd, fmt::format("client:{}:{}", ip, port)};
 }
 
 }  // namespace mynet

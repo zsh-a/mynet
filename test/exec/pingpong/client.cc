@@ -17,10 +17,10 @@ using namespace mynet;
 
 int block_size = 16 * 1024;
 Connection::Buffer buf(block_size);
-
+EventLoop g_loop;
 int cnt = 100000;
 Task<bool> client(){
-  auto conn = co_await mynet::open_connection("127.0.0.1",9999);
+  auto conn = co_await mynet::open_connection(&g_loop,"127.0.0.1",9999);
   co_await conn.write(buf);
   size_t tot = 0;
   for(int i = 0;i < cnt;i++){
@@ -43,9 +43,8 @@ int main(int argc,char* argv[]) {
 
   for(int i = 0;i < block_size;i++) buf[i] = i % 128;
   {
-    auto& loop = EventLoop::get();
     for(int i = 0;i < atoi(argv[1]);i++)
-          mynet::create_task(client());
-    loop.run();
+          g_loop.create_task(client());
+    g_loop.run();
   }
 }

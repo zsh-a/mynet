@@ -1,7 +1,10 @@
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include "nanobench.h"
 #include"mynet/task.h"
+#include<bits/stdc++.h>
 using namespace mynet;
+using   namespace std;
+
 int main() {
     // double d = 1.0;
     // ankerl::nanobench::Bench().run("some double ops", [&] {
@@ -17,9 +20,11 @@ int main() {
     };
 
     ankerl::nanobench::Bench().run("simple task", [&] {
-        // auto& loop = EventLoop::get();
+        EventLoop g_loop;
         // auto g = simple();
         // loop.run_until_done(g.get_resumable());        
-        mynet::create_task(simple());
+        for(int i = 0;i < 100;i++)
+            g_loop.create_task(simple());
+        g_loop.run();
     });
 }
