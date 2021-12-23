@@ -171,8 +171,8 @@ int main() {
 
     // g_loop.run();
     mynet::EventLoopThreadPool pool(&g_loop, 2);
-    pool.get_next_loop()->run_in_loop(cur_thread().get_resumable());
-    pool.get_next_loop()->run_in_loop(cur_thread().get_resumable());
+    pool.get_next_loop()->queue_in_loop(cur_thread());
+    pool.get_next_loop()->queue_in_loop(cur_thread());
 
     // std::this_thread::sleep_for(std::chrono::seconds(2));
     // g_loop.create_task();

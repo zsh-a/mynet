@@ -76,10 +76,8 @@ class TcpServer : private NonCopyable {
       auto loop = pool_->get_next_loop();
       auto conn = std::make_shared<Connection>(loop, client_fd, remote_addr,
                                                conn_name);
-      // connected.emplace_back(loop_->create_task(cb_(std::move(conn))));
-      auto t = cb_(std::move(conn));
-      loop->run_in_loop(t.get_resumable());
-      connected.push_back(std::move(t));
+
+      connected.push_back(loop->queue_in_loop(cb_(std::move(conn))));
       // TODO destory connections
       gc();
       // connections_map_[conn_name] = conn;

@@ -61,6 +61,12 @@ class EventLoop : private NonCopyable {
     return std::forward<Task>(task);
   }
 
+  template <typename Task>
+  auto&& queue_in_loop(Task&& task){
+    run_in_loop(task.get_resumable());
+    return std::forward<Task>(task);
+  }
+
   void run_in_loop(Resumable* task) {
     {
       std::lock_guard<std::mutex> lock(mutex_);

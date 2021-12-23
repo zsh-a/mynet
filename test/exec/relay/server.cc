@@ -29,8 +29,8 @@ Task<bool> tunnel(Connection::Ptr client, Connection::Ptr server) {
 Task<bool> relay(Connection::Ptr conn) {
   auto server = co_await open_connection(conn->loop_,"0.0.0.0", 3000).run_in(conn->loop_);
   auto ptr = make_shared<Connection>(std::move(server));
-  conn->loop_->run_in_loop(tunnel(conn, ptr).get_resumable());
-  conn->loop_->run_in_loop(tunnel(ptr, conn).get_resumable());
+  conn->loop_->queue_in_loop(tunnel(conn, ptr));
+  conn->loop_->queue_in_loop(tunnel(ptr, conn));
   co_return true;
 }
 
