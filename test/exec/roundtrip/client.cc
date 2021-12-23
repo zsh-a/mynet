@@ -18,23 +18,23 @@ using namespace mynet;
 EventLoop g_loop;
 
 Task<bool> client() {
-  auto conn = co_await mynet::open_connection(&g_loop, "0.0.0.0", 9999);
+  auto conn = co_await mynet::open_connection(&g_loop, "0.0.0.0", 9999).run_in(&g_loop);
   Connection::Buffer buf(16);
   while (1) {
     auto now = duration_cast<chrono::microseconds>(
                    chrono::system_clock::now().time_since_epoch())
                    .count();
     memcpy(buf.data(), &now, sizeof now);
-    co_await conn.write(buf);
-    auto recv_buf = co_await conn.readn(16);
+    co_await conn.write(buf).run_in(&g_loop);
+    auto recv_buf = co_await conn.readn(16).run_in(&g_loop);
     int64_t message[2]{};
     memcpy(message, recv_buf.data(), 16);
     int64_t send = message[0];
     int64_t their = message[1];
     int64_t back = conn.channel()->event_time().count();
     int64_t mine = (back + send) / 2;
-    fmt::print("round trip : {}  clock error : {}\n", back - send,
-               their - mine);
+    fmt::print("round trip : {}  clock error : {}\n", chrono::microseconds(back - send),
+               chrono::microseconds(their - mine));
     co_await mynet::sleep(&g_loop, milliseconds(500));
   }
   conn.shutdown_write();

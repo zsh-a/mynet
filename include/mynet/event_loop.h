@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <thread>
 
 #include "fmt/format.h"
 #include "mynet/common.h"
@@ -15,15 +16,22 @@ using namespace std::chrono;
 using TimeDuration = milliseconds;
 using Poller = Epoller;
 class EventLoop : private NonCopyable {
+  std::thread::id thread_id_;
   std::queue<Resumable*> ready_;
   using TimerHandle = std::pair<TimeDuration, Resumable*>;
   std::vector<TimerHandle> schedule_;  // heap
   Poller poller_;
 
+  int wake_fd_{-1};
+  std::unique_ptr<Channel> wake_channel_;
+
   mutable std::mutex mutex_;
   std::vector<Resumable*> pending_tasks_;  // protected by mutex_
 
+  bool do_pending_tasks_{false};
+
   void run_pending_tasks() {
+    do_pending_tasks_ = true;
     std::vector<Resumable*> tasks;
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -32,15 +40,15 @@ class EventLoop : private NonCopyable {
     for (auto taks : tasks) {
       taks->resume();
     }
+    do_pending_tasks_ = false;
   }
+
+  bool is_in_loop_thread() { return std::this_thread::get_id() == thread_id_; }
 
  public:
   TimeDuration start_time_;
 
-  EventLoop() {
-    auto now = system_clock::now();
-    start_time_ = duration_cast<TimeDuration>(now.time_since_epoch());
-  }
+  EventLoop();
 
   // static EventLoop& get() {
   //   static EventLoop loop;
@@ -57,6 +65,9 @@ class EventLoop : private NonCopyable {
     {
       std::lock_guard<std::mutex> lock(mutex_);
       pending_tasks_.push_back(task);
+    }
+    if (!is_in_loop_thread() || do_pending_tasks_) {
+      wakeup();
     }
   }
 
@@ -88,6 +99,14 @@ class EventLoop : private NonCopyable {
   void run() {
     while (schedule_.size() || ready_.size() || !poller_.is_stop()) {
       run_once();
+    }
+  }
+
+  void wakeup() {
+    uint64_t one = 1;
+    ssize_t n = ::write(wake_fd_, &one, sizeof one);
+    if (n != sizeof one) {
+      log::Log(log::Error, "wakeup return {}", n);
     }
   }
 

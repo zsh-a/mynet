@@ -51,18 +51,25 @@ Task<Connection> open_connection(EventLoop* loop, std::string_view ip,
   }
   auto address = internel::AddressInfo{server_info};
   int fd = -1;
-  for (auto p = server_info; p != nullptr; p = p->ai_next) {
-    fd = -1;
-
+  auto p = server_info;
+  fd = -1;
+  int cnt = 2;
+  for (;;) {
     if ((fd = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK,
-                     p->ai_protocol)) == 1)
-      continue;
-    if ((co_await internel::connect(loop, fd, p->ai_addr, p->ai_addrlen)(loop))) {
+                     p->ai_protocol)) == -1) {
+      log::Log(log::Error, "create socket");
+      exit(errno);
+    }
+
+    if ((co_await internel::connect(loop, fd, p->ai_addr, p->ai_addrlen)
+             .run_in(loop))) {
       break;
     }
-    fmt::print("connect to {}:{} failed, retrying\n", p->ai_addr->sa_data,
-               port_str);
     ::close(fd);
+    fmt::print("connect to {}:{} failed, waiting {}s. retrying...\n", ip,
+               port_str, cnt);
+    co_await mynet::sleep(loop, std::chrono::seconds(cnt));
+    cnt *= 2;
   }
 
   if (fd == -1) {

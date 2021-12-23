@@ -71,14 +71,14 @@ struct Task {
 
   Resumable* get_resumable() { return &handle_.promise(); }
 
-  auto& operator()(EventLoop* loop) {
+  auto& run_in(EventLoop* loop) {
     handle_.promise().loop_ = loop;
     return *this;
   }
 
   // Task(const auto& handle) : handle_(handle) {}
   Task() = default;
-  explicit Task(coro_handle h) noexcept: handle_(h) {}
+  explicit Task(coro_handle h) noexcept : handle_(h) {}
   Task(Task&& t) noexcept : handle_(std::exchange(t.handle_, {})) {}
   ~Task() {
     if (handle_ && handle_.done()) handle_.destroy();

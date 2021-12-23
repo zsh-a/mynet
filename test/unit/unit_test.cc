@@ -1,10 +1,13 @@
 
 // #define CATCH_CONFIG_MAIN
+#include <chrono>
 #include <iostream>
-#include<chrono>
+
 #include "gtest/gtest.h"
 #include "mynet/add.h"
 #include "mynet/event_loop.h"
+#include "mynet/channel.h"
+// #include "mynet/event_loop_thread_pool.h"
 #include "mynet/sleep.h"
 #include "mynet/task.h"
 // #include "catch2/catch.hpp"
@@ -31,8 +34,8 @@ TEST(epoll, timeout) {
   EXPECT_TRUE(end - start >= milliseconds{500});
 }
 
-Task<bool> sleep2s(){
-  co_await mynet::sleep(&g_loop,std::chrono::milliseconds(2000));
+Task<bool> sleep2s() {
+  co_await mynet::sleep(&g_loop, std::chrono::milliseconds(2000));
 }
 
 TEST(task, sleep) {
@@ -41,10 +44,10 @@ TEST(task, sleep) {
   g_loop.create_task(sleep2s());
   g_loop.run();
   auto end = g_loop.time();
-  EXPECT_TRUE(end - start >=  milliseconds{2000});
+  EXPECT_TRUE(end - start >= milliseconds{2000});
 }
 
-Task<int> many_resume(){
+Task<int> many_resume() {
   co_await std::suspend_always{};
   co_await std::suspend_always{};
   fmt::print("~~~~~~~~~\n");
@@ -60,8 +63,6 @@ Task<int> many_resume(){
 //   EXPECT_EQ(g.get_result(),0);
 // }
 
-
-
 struct Dummy {};
 Task<Dummy> coro1(std::vector<int>& result) {
   result.push_back(1);
@@ -70,21 +71,21 @@ Task<Dummy> coro1(std::vector<int>& result) {
 
 Task<Dummy> coro2(std::vector<int>& result) {
   result.push_back(2);
-  co_await coro1(result)(&g_loop);
+  co_await coro1(result).run_in(&g_loop);
   result.push_back(20);
   co_return Dummy{};
 }
 
 Task<Dummy> coro3(std::vector<int>& result) {
   result.push_back(3);
-  co_await coro2(result)(&g_loop);
+  co_await coro2(result).run_in(&g_loop);
   result.push_back(30);
   co_return Dummy{};
 }
 
 Task<Dummy> coro4(std::vector<int>& result) {
   result.push_back(4);
-  co_await coro3(result)(&g_loop);
+  co_await coro3(result).run_in(&g_loop);
   result.push_back(40);
   co_return Dummy{};
 }
@@ -114,54 +115,64 @@ TEST_F(TaskAwaitTest, task) {
 }
 
 TEST_F(TaskAwaitTest, task2) {
-  std::vector<int> expected{2,1,20};
-  g_loop.run_until_done(coro2(result)(&g_loop).get_resumable());
+  std::vector<int> expected{2, 1, 20};
+  g_loop.run_until_done(coro2(result).run_in(&g_loop).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
 TEST_F(TaskAwaitTest, task3) {
-  std::vector<int> expected{3,2,1,20,30};
-  g_loop.run_until_done(coro3(result)(&g_loop).get_resumable());
+  std::vector<int> expected{3, 2, 1, 20, 30};
+  g_loop.run_until_done(coro3(result).run_in(&g_loop).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
 TEST_F(TaskAwaitTest, task4) {
-  std::vector<int> expected{4,3,2,1,20,30,40};
-  g_loop.run_until_done(coro4(result)(&g_loop).get_resumable());
+  std::vector<int> expected{4, 3, 2, 1, 20, 30, 40};
+  g_loop.run_until_done(coro4(result).run_in(&g_loop).get_resumable());
   EXPECT_EQ(result, expected);
 }
 
-Task<int> mul(int a,int b){
-  co_return a * b;
-}
+Task<int> mul(int a, int b) { co_return a* b; }
 
-Task<int> get_await_result(){
-  auto a = co_await mul(2,3)(&g_loop);
-  auto b = co_await mul(4,5)(&g_loop);
+Task<int> get_await_result() {
+  auto a = co_await mul(2, 3).run_in(&g_loop);
+  auto b = co_await mul(4, 5).run_in(&g_loop);
   co_return a + b;
 }
 
 TEST(task, get_await_result) {
   auto g = get_await_result();
   g_loop.run_until_done(g.get_resumable());
-  EXPECT_EQ(g.get_result(),26);
+  EXPECT_EQ(g.get_result(), 26);
 }
 
-Task<int> fibo(int n){
-  if(n <= 1) co_return n;
-  auto x = co_await fibo(n - 1)(&g_loop);
-  x += co_await fibo(n - 2)(&g_loop);
+Task<int> fibo(int n) {
+  if (n <= 1) co_return n;
+  auto x = co_await fibo(n - 1).run_in(&g_loop);
+  x += co_await fibo(n - 2).run_in(&g_loop);
   co_return x;
 }
 
 TEST(task, fibo3) {
-  auto& g = fibo(3)(&g_loop);
+  auto& g = fibo(3).run_in(&g_loop);
   g_loop.run_until_done(g.get_resumable());
-  EXPECT_EQ(g.get_result(),2);
+  EXPECT_EQ(g.get_result(), 2);
 }
 
 TEST(task, fibo7) {
-  auto& g = fibo(8)(&g_loop);
+  auto& g = fibo(8).run_in(&g_loop);
   g_loop.run_until_done(g.get_resumable());
-  EXPECT_EQ(g.get_result(),21);
+  EXPECT_EQ(g.get_result(), 21);
 }
+
+// TEST(event_loop_thread_pool, basic) {
+//   std::cout << "current thread : " << std::this_thread::get_id() << "\n";
+//   auto cur_thread = []() -> Task<bool> {
+//     //  fmt::print("current thread : {} \n",std::this_thread::get_id());
+//     std::cout << "current thread : " << std::this_thread::get_id() << "\n";
+//   };
+//   mynet::EventLoopThreadPool pool(&g_loop, 2);
+//   pool.get_next_loop()->create_task(cur_thread());
+//   pool.get_next_loop()->create_task(cur_thread());
+//   std::this_thread::sleep_for(std::chrono::seconds(2));
+// }

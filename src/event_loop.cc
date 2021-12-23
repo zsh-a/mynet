@@ -1,7 +1,28 @@
 #include "mynet/event_loop.h"
 
+#include <sys/eventfd.h>
+
 #include "mynet/channel.h"
+#include<iostream>
 namespace mynet {
+
+int create_event_fd() {
+  int evtfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+  if (evtfd < 0) {
+    log::Log(log::Error, "create event fd");
+    abort();
+  }
+  return evtfd;
+}
+
+EventLoop::EventLoop()
+    : thread_id_(std::this_thread::get_id()),
+      wake_fd_(create_event_fd()),
+      wake_channel_(new Channel(wake_fd_)) {
+  auto now = system_clock::now();
+  start_time_ = duration_cast<TimeDuration>(now.time_since_epoch());
+  wake_channel_->register_read(this);
+}
 
 void EventLoop::run_once() {
   TimeDuration timeout{0};
@@ -29,11 +50,19 @@ void EventLoop::run_once() {
 
     if (revents & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
       // if(readCallBack_) readCallBack_(receiveTime);
-      ready_.emplace(channel->resume_read());
+      if (channel->resume_read())
+        ready_.emplace(channel->resume_read());
+      else {
+        // wakeup event
+        int64_t i = 0;
+        // static int c = 0;
+        auto n = ::read(channel->fd(), &i, sizeof(i));
+        // fmt::print("{} {}\n",now,++c);
+      }
     }
 
     if (revents & EPOLLOUT) {
-      ready_.emplace(channel->resume_write());
+      if (channel->resume_write()) ready_.emplace(channel->resume_write());
     }
     channel->set_event_time(now);
   }

@@ -1,6 +1,7 @@
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include "nanobench.h"
 #include"mynet/task.h"
+#include"mynet/channel.h"
 #include<bits/stdc++.h>
 using namespace mynet;
 using   namespace std;

@@ -4,12 +4,13 @@
 #include <memory>
 
 #include "fmt/color.h"
+#include "mynet/event_loop_thread_pool.h"
 #include "mynet/sockets.h"
 #include "mynet/task.h"
 namespace mynet {
 
 template <typename Callback>
-class TcpServer {
+class TcpServer : private NonCopyable {
   EventLoop* loop_{nullptr};
 
   int fd_{-1};
@@ -20,20 +21,25 @@ class TcpServer {
   uint32_t conn_id{0};
   std::map<std::string, Connection::Ptr> connections_map_;
 
+  std::unique_ptr<EventLoopThreadPool> pool_;
+
  public:
   static constexpr int DEFAULT_MAX_CONNECTIONS = 8;
-  TcpServer(EventLoop* loop, int fd, std::string_view name, Callback cb)
+  TcpServer(EventLoop* loop, int fd, std::string_view name, Callback cb,
+            int num_thread = 0)
       : loop_(loop),
         fd_(fd),
         channel_(fd),
         name_(name),
-        cb_(std::forward<Callback>(cb)) {}
+        cb_(std::forward<Callback>(cb)),
+        pool_(std::make_unique<EventLoopThreadPool>(loop_, num_thread)) {}
   TcpServer(TcpServer&& other)
       : loop_(other.loop_),
         fd_(std::exchange(other.fd_, -1)),
         channel_(other.channel_),
         name_(std::move(other.name_)),
-        cb_(other.cb_) {}
+        cb_(other.cb_),
+        pool_(std::move(other.pool_)) {}
 
   Task<Connection> serve() {
     // std::list<Task<bool>> connections;
@@ -67,10 +73,14 @@ class TcpServer {
       std::string conn_name =
           fmt::format("{}-{}#{}", name_, ip_port, conn_id++);
       log::Log(log::Info, "received connection from {}", conn_name);
-
-      auto conn = std::make_shared<Connection>(loop_, client_fd, remote_addr,
+      auto loop = pool_->get_next_loop();
+      auto conn = std::make_shared<Connection>(loop, client_fd, remote_addr,
                                                conn_name);
-      connected.emplace_back(loop_->create_task(cb_(std::move(conn))));
+      // connected.emplace_back(loop_->create_task(cb_(std::move(conn))));
+      auto t = cb_(std::move(conn));
+      loop->run_in_loop(t.get_resumable());
+      connected.push_back(std::move(t));
+      // TODO destory connections
       gc();
       // connections_map_[conn_name] = conn;
     }
@@ -145,7 +155,7 @@ Task<TcpServer<Callback>> start_tcp_server(EventLoop* loop, std::string_view ip,
     fmt::print("server listen failed {}\n", errno);
     exit(errno);
   }
-  co_return TcpServer{loop, server_fd, name, cb};
+  co_return TcpServer{loop, server_fd, name, cb,2};
 }
 
 }  // namespace mynet

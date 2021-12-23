@@ -59,6 +59,10 @@ class Connection : NonCopyable {
   auto name() { return name_; }
 
   void shutdown_write() { ::shutdown(fd_, SHUT_WR); }
+  void shutdown() { 
+    ::close(fd_);
+    fd_ = -1;
+  }
 
   ~Connection() {
     if (fd_ > 0) {

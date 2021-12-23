@@ -6,12 +6,13 @@
 // #include "mynet/generator.h"
 #include <memory>
 
+#include "fmt/os.h"
 #include "mynet/event_loop.h"
 #include "mynet/sleep.h"
-#include "mynet/task.h"
 #include "mynet/sockets.h"
+#include "mynet/task.h"
 #include "mynet/tcp_server.h"
-#include "fmt/os.h"
+#include "mynet/event_loop_thread_pool.h"
 using namespace std;
 using namespace mynet;
 // using IntGenerator = Generator<int>;
@@ -23,14 +24,14 @@ EventLoop g_loop;
 Task<std::string> hello() {
   fmt::print("enter hello\n");
 
-  co_await mynet::sleep(&g_loop,chrono::milliseconds(1000));
+  co_await mynet::sleep(&g_loop, chrono::milliseconds(1000));
   fmt::print("leave hello\n");
   co_return "hello";
 }
 
 Task<std::string> world() {
   fmt::print("enter world\n");
-  co_await mynet::sleep(&g_loop,chrono::milliseconds(1000));
+  co_await mynet::sleep(&g_loop, chrono::milliseconds(1000));
   fmt::print("leave world\n");
   co_return "world";
 }
@@ -48,37 +49,37 @@ Task<std::string> helloworld() {
 // }
 
 NoWaitTask<> run_sleep() {
-  co_await mynet::sleep(&g_loop,chrono::milliseconds(2000));
+  co_await mynet::sleep(&g_loop, chrono::milliseconds(2000));
   fmt::print("timeout\n");
 }
 
-Task<bool> conn_test(){
-  auto conn = co_await open_connection(&g_loop,"127.0.0.1",8000);
+Task<bool> conn_test() {
+  auto conn = co_await open_connection(&g_loop, "127.0.0.1", 8000);
   // co_await mynet::sleep(5000);
   // co_await mynet::sleep(10000);
   auto buf = co_await conn.read_until_eof();
   // for(auto x : buf) fmt::print("{}",x);
   // fmt::print("\n");
-  fmt::print("read {} bytes\n",buf.size());
+  fmt::print("read {} bytes\n", buf.size());
   auto out = fmt::output_file("guide.txt");
-  out.print("{}", string(buf.begin(),buf.end()));
+  out.print("{}", string(buf.begin(), buf.end()));
   co_return true;
 }
 
-Task<bool> echo_server(Connection::Ptr conn){
-  while(1){
-    auto buf = co_await conn->read(4* 1024);
-    if(buf.size() == 0) break;
+Task<bool> echo_server(Connection::Ptr conn) {
+  while (1) {
+    auto buf = co_await conn->read(4 * 1024);
+    if (buf.size() == 0) break;
     // fmt::print("receiving data {}\n",buf.data());
-    if(!co_await conn->write(buf)) break; 
+    if (!co_await conn->write(buf)) break;
   }
   co_return true;
 }
 
-
-Task<bool> tcp_server_test(){
-  Connection::Buffer buf{'h','e','l','l','o','\n'};
-  auto server = co_await start_tcp_server(&g_loop,"0.0.0.0",9999,echo_server,"tcp server");
+Task<bool> tcp_server_test() {
+  Connection::Buffer buf{'h', 'e', 'l', 'l', 'o', '\n'};
+  auto server = co_await start_tcp_server(&g_loop, "0.0.0.0", 9999, echo_server,
+                                          "tcp server");
   co_await server.serve();
 }
 
@@ -148,9 +149,33 @@ int main() {
   //   loop.run();
   // }
 
+  // {
+  //   g_loop.create_task(tcp_server_test());
+  //   g_loop.run();
+  // }
+
   {
-    g_loop.create_task(tcp_server_test());
+    std::cout << "current thread : " << std::this_thread::get_id() << "\n";
+    auto cur_thread = []() -> Task<bool> {
+      //  fmt::print("current thread : {} \n",std::this_thread::get_id());
+      std::cout << "current thread : " << std::this_thread::get_id() << "\n";
+      co_return true;
+    };
+
+
+    // std::jthread t([&](){
+    //   EventLoop loop;
+    //   loop.create_task(cur_thread());
+    //   loop.run();
+    // });
+
+    // g_loop.run();
+    mynet::EventLoopThreadPool pool(&g_loop, 2);
+    pool.get_next_loop()->run_in_loop(cur_thread().get_resumable());
+    pool.get_next_loop()->run_in_loop(cur_thread().get_resumable());
+
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // g_loop.create_task();
     g_loop.run();
   }
-
 }

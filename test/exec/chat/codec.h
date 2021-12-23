@@ -20,7 +20,7 @@ vector<char> encode(const string& msg){
 }
 
 Task<tuple<State,std::string>> decode(const Connection::Ptr& conn) {
-    auto buf = co_await conn->read(4)(conn->loop_);
+    auto buf = co_await conn->read(4).run_in(conn->loop_);
     if(buf.size() == 0) co_return {State::DISCONNECTED,string()};
 
     auto n32 =  *reinterpret_cast<uint32_t*>(buf.data());
@@ -29,6 +29,6 @@ Task<tuple<State,std::string>> decode(const Connection::Ptr& conn) {
       log::Log(log::Error,"invalid length {}",msg_len);
       co_return {State::DISCONNECTED,string()};
     }
-    buf = co_await conn->read(msg_len)(conn->loop_);
+    buf = co_await conn->read(msg_len).run_in(conn->loop_);
     co_return {State::CONNECTED,string(buf.begin(),buf.end())};
 }

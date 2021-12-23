@@ -24,14 +24,14 @@ EventLoop g_loop;
 
 Task<bool> chat(Connection::Ptr conn,std::map<std::string,Connection::Ptr>& peers){
   while(1){
-    auto [state,msg] =  co_await decode(conn)(conn->loop_);
+    auto [state,msg] =  co_await decode(conn).run_in(conn->loop_);
     if(state == State::DISCONNECTED) {
       conn->shutdown_write();
       break;
     }
     auto buf = encode(msg);
     for(auto&& [name,conn]:peers){
-      co_await conn->write(buf)(conn->loop_);
+      co_await conn->write(buf).run_in(conn->loop_);
     }
     log::Log(log::Info,"from {} : message {}. length : {}",conn->name(),msg,msg.size());
   }
@@ -43,9 +43,9 @@ Task<bool> chat(Connection::Ptr conn,std::map<std::string,Connection::Ptr>& peer
 Task<bool> chat_server(){
   std::map<std::string,Connection::Ptr> peers;
 
-  auto server = co_await start_tcp_server(&g_loop,"0.0.0.0",9999,chat,"chat server")(&g_loop);
+  auto server = co_await start_tcp_server(&g_loop,"0.0.0.0",9999,chat,"chat server").run_in(&g_loop);
   for(;;){
-    auto conn = co_await server.accept(&g_loop)(&g_loop);
+    auto conn = co_await server.accept(&g_loop).run_in(&g_loop);
     peers[conn->name()] = conn;
     g_loop.create_task(chat(conn,peers));
   }

@@ -20,15 +20,15 @@ Connection::Buffer buf(block_size);
 EventLoop g_loop;
 int cnt = 100000;
 Task<bool> client(){
-  auto conn = co_await mynet::open_connection(&g_loop,"127.0.0.1",9999);
-  co_await conn.write(buf);
+  auto conn = co_await mynet::open_connection(&g_loop,"127.0.0.1",9999).run_in(&g_loop);
+  co_await conn.write(buf).run_in(&g_loop);
   size_t tot = 0;
   for(int i = 0;i < cnt;i++){
-    auto buf = co_await conn.read(block_size);
+    auto buf = co_await conn.read(block_size).run_in(&g_loop);
     tot += buf.size();
     if(buf.size() == 0) break;
     // fmt::print("receiving data {}\n",buf.data());
-    if(!co_await conn.write(buf)) break; 
+    if(!co_await conn.write(buf).run_in(&g_loop)) break; 
   }
   conn.shutdown_write();
   // do{

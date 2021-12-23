@@ -22,7 +22,6 @@ void Epoller::update_channel(Channel* channel) {
     if (int ret = ::epoll_ctl(fd_, EPOLL_CTL_ADD, channel->fd(), &event);
         ret != 0) {
       perror("add failed");
-      fmt::print("epoll add failed {}\n", fd_);
     }
   }
 }

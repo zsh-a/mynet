@@ -19,21 +19,22 @@ EventLoop g_loop;
 
 Task<bool> rtt_server(Connection::Ptr conn) {
   while (1) {
-    auto buf = co_await conn->readn(16);
+    auto buf = co_await conn->readn(16).run_in(conn->loop_);
     if (buf.size() == 0) {
       break;
     }
     auto recv_time = conn->channel()->event_time().count();
     memcpy(buf.data() + 8, &recv_time, sizeof(recv_time));
-    co_await conn->write(buf);
+    co_await conn->write(buf).run_in(conn->loop_);
   }
   co_return true;
 }
 
 Task<bool> rtt_server_test() {
   auto server = co_await start_tcp_server(&g_loop, "0.0.0.0", 9999, rtt_server,
-                                          "rtt_server");
-  co_await server.serve();
+                                          "rtt_server").run_in(&g_loop);
+
+  co_await server.serve().run_in(&g_loop);
 }
 
 int main() {
