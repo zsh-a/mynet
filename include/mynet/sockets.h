@@ -7,6 +7,7 @@
 
 #include "mynet/connection.h"
 #include "mynet/task.h"
+#include "mynet/sleep.h"
 namespace mynet {
 
 namespace internel {

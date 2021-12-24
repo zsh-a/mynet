@@ -24,7 +24,7 @@ class TcpServer : private NonCopyable {
   std::unique_ptr<EventLoopThreadPool> pool_;
 
  public:
-  static constexpr int DEFAULT_MAX_CONNECTIONS = 8;
+  static constexpr int DEFAULT_MAX_CONNECTIONS = 4096;
   TcpServer(EventLoop* loop, int fd, std::string_view name, Callback cb,
             int num_thread = 0)
       : loop_(loop),
@@ -153,7 +153,7 @@ Task<TcpServer<Callback>> start_tcp_server(EventLoop* loop, std::string_view ip,
     fmt::print("server listen failed {}\n", errno);
     exit(errno);
   }
-  co_return TcpServer{loop, server_fd, name, cb,2};
+  co_return TcpServer{loop, server_fd, name, cb,0};
 }
 
 }  // namespace mynet
