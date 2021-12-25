@@ -29,7 +29,7 @@ class TcpServer : private NonCopyable {
             int num_thread = 0)
       : loop_(loop),
         fd_(fd),
-        channel_(fd),
+        channel_(loop, fd),
         name_(name),
         cb_(std::forward<Callback>(cb)),
         pool_(std::make_unique<EventLoopThreadPool>(loop_, num_thread)) {}
@@ -42,22 +42,26 @@ class TcpServer : private NonCopyable {
         pool_(std::move(other.pool_)) {}
 
   Task<Connection> serve() {
-    // std::list<Task<bool>> connections;
-
     std::list<Task<bool>> connected;
 
-    auto gc = [&]() {
-      if (connected.size() < 100) [[likely]] {
-        return;
-      }
-      for (auto iter = connected.begin(); iter != connected.end();) {
-        if (iter->done()) {
-          iter = connected.erase(iter);
-        } else {
-          ++iter;
+    auto gc = [&]() -> Task<bool> {
+      for (;;) {
+        co_await mynet::sleep(loop_, std::chrono::seconds(5));
+        if (connected.size() < 100) [[likely]] {
+          continue;
+        }
+        for (auto iter = connected.begin(); iter != connected.end();) {
+          if (iter->done()) {
+            iter = connected.erase(iter);
+          } else {
+            ++iter;
+          }
         }
       }
+      co_return true;
     };
+    loop_->create_task(gc());
+
     while (1) {
       co_await channel_.read(loop_);
       sockaddr_storage remote_addr{};
@@ -72,14 +76,13 @@ class TcpServer : private NonCopyable {
           addr->sin_addr.s_addr >> 24 & 0xff, addr->sin_port);
       std::string conn_name =
           fmt::format("{}-{}#{}", name_, ip_port, conn_id++);
-      log::Log(log::Info, "received connection from {}", conn_name);
+      log::Log(log::Info, "received connection from {}  fd {}", conn_name,
+               client_fd);
       auto loop = pool_->get_next_loop();
-      auto conn = std::make_shared<Connection>(loop, client_fd, remote_addr,
-                                               conn_name);
+      auto conn =
+          std::make_shared<Connection>(loop, client_fd, remote_addr, conn_name);
 
       connected.push_back(loop->queue_in_loop(cb_(std::move(conn))));
-      // TODO destory connections
-      gc();
       // connections_map_[conn_name] = conn;
     }
   }
@@ -101,7 +104,8 @@ class TcpServer : private NonCopyable {
         addr->sin_addr.s_addr >> 8 & 0xff, addr->sin_addr.s_addr >> 16 & 0xff,
         addr->sin_addr.s_addr >> 24 & 0xff, addr->sin_port);
     std::string conn_name = fmt::format("{}-{}#{}", name_, ip_port, conn_id++);
-    log::Log(log::Info, "received connection from {}", conn_name);
+    log::Log(log::Info, "received connection from {}  fd {}", conn_name,
+             client_fd);
 
     auto conn =
         std::make_shared<Connection>(loop, client_fd, remote_addr, conn_name);
@@ -153,7 +157,8 @@ Task<TcpServer<Callback>> start_tcp_server(EventLoop* loop, std::string_view ip,
     fmt::print("server listen failed {}\n", errno);
     exit(errno);
   }
-  co_return TcpServer{loop, server_fd, name, cb,0};
+  log::Log(log::Info, "start tcp server fd : {}", server_fd);
+  co_return TcpServer{loop, server_fd, name, cb, 0};
 }
 
 }  // namespace mynet

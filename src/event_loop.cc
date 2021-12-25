@@ -2,8 +2,10 @@
 
 #include <sys/eventfd.h>
 
+#include <iostream>
+
 #include "mynet/channel.h"
-#include<iostream>
+#include "mynet/task.h"
 namespace mynet {
 
 int create_event_fd() {
@@ -18,10 +20,18 @@ int create_event_fd() {
 EventLoop::EventLoop()
     : thread_id_(std::this_thread::get_id()),
       wake_fd_(create_event_fd()),
-      wake_channel_(new Channel(wake_fd_)) {
+      wake_channel_(new Channel(this, wake_fd_)) {
   auto now = system_clock::now();
   start_time_ = duration_cast<TimeDuration>(now.time_since_epoch());
-  wake_channel_->register_read(this);
+
+  wake_channel_->register_read(new Func{
+    [this](){
+      int64_t i = 0;
+      ::read(wake_fd_,&i,sizeof i);
+    }
+  });
+
+  log::Log(log::Info, "wake up fd : {}", wake_fd_);
 }
 
 void EventLoop::run_once() {
@@ -36,35 +46,16 @@ void EventLoop::run_once() {
   auto events = poller_.poll(timeout.count());
   auto now =
       duration_cast<microseconds>(system_clock::now().time_since_epoch());
+  // fmt::print("~~~~~~~{}\n",events.size());
+  // if(events.size() > 0){
+  //   fmt::print("eve : {}\n",events[0].events);
+  // }
 
   for (const auto& e : events) {
     Channel* channel = reinterpret_cast<Channel*>(e.ptr);
-    int revents = e.events;
-    // if(revents & EPOLLNVAL){
-    //   LOG_WARN << "Channel::handleEvent() POLLNVAL";
-    // }
-
-    // if((revents & EPOLLHUP) && !(revents & EPOLLIN)){
-    //     if(closeCallback_) closeCallback_();
-    // }
-
-    if (revents & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
-      // if(readCallBack_) readCallBack_(receiveTime);
-      if (channel->resume_read())
-        ready_.emplace(channel->resume_read());
-      else {
-        // wakeup event
-        int64_t i = 0;
-        // static int c = 0;
-        auto n = ::read(channel->fd(), &i, sizeof(i));
-        // fmt::print("{} {}\n",now,++c);
-      }
-    }
-
-    if (revents & EPOLLOUT) {
-      if (channel->resume_write()) ready_.emplace(channel->resume_write());
-    }
+    channel->revents_ = e.events;
     channel->set_event_time(now);
+    channel->handle_event();
   }
 
   auto end_time = time();

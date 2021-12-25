@@ -19,7 +19,7 @@ Task<bool> connect(EventLoop* loop, int fd, const sockaddr* addr,
     perror("exception happened");
     exit(errno);
   }
-  Channel channel(fd);
+  Channel channel(loop, fd);
   co_await channel.write(loop);
   int result{0};
   socklen_t result_len = sizeof(result);

@@ -18,7 +18,7 @@ using namespace mynet;
 
 EventLoop g_loop;
 Task<bool> send(Connection::Ptr conn) {
-  Channel channel(0);
+  Channel channel(&g_loop, 0);
   while (1) {
     co_await channel.read(&g_loop);
     char msg[128]{};

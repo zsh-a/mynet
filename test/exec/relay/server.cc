@@ -23,7 +23,8 @@ Task<bool> tunnel(Connection::Ptr client, Connection::Ptr server) {
     }
     co_await server->write(buf).run_in(server->loop_);
   }
-  server->shutdown_write();
+  client->close();
+  server->close();
 }
 
 Task<bool> relay(Connection::Ptr conn) {

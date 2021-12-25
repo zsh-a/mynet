@@ -47,7 +47,7 @@ struct HttpResponse {
   int content_length{0};
   std::string body_;
 
-  HttpResponse() : version_(Version::HTTP10), status_code_(StatusCode::k200Ok) {
+  HttpResponse() : version_(Version::HTTP11), status_code_(StatusCode::k200Ok) {
     headers_["Server"] = "mynet";
     auto const t = std::time(nullptr);
     auto tm = *std::gmtime(&t);
@@ -63,13 +63,26 @@ struct HttpResponse {
     headers_["Content-Length"] = std::to_string(content_length);
   }
 
+  std::string to_string() {
+    // s.reserve(1024);
+    std::string s;
+    s.reserve(1024);
+    s += fmt::format("{} {}\r\n", version_to_string[version_],
+                     status_code_to_string[status_code_]);
+    for (auto &&[k, v] : headers_) {
+      s += fmt::format("{}: {}\r\n", k, v);
+    }
+    s += "\r\n" + body_;
+    return s;
+  }
+
   Connection::Buffer to_buffer() {
     Connection::Buffer buf;
     buf.reserve(1024);
     auto s = fmt::format("{} {}\r\n", version_to_string[version_],
                          status_code_to_string[status_code_]);
     buf.insert(buf.end(), s.begin(), s.end());
-    for (auto&& [k, v] : headers_) {
+    for (auto &&[k, v] : headers_) {
       s = fmt::format("{}: {}\r\n", k, v);
       buf.insert(buf.end(), s.begin(), s.end());
     }
@@ -254,7 +267,7 @@ class HttpContext {
       "<hr><center>mynet</center>"
       "</body>"
       "</html>";
-  HttpResponse get_error_resp(int code, const std::string& msg) {
+  HttpResponse get_error_resp(int code, const std::string &msg) {
     HttpResponse resp{};
     auto body = fmt::format(error_template, code, msg);
     resp.set_body(body);
@@ -263,27 +276,30 @@ class HttpContext {
 
  public:
   template <typename HttpHandler>
-  Task<bool> process_http(const Connection::Ptr& conn, HttpHandler&& handler) {
+  Task<bool> process_http(const Connection::Ptr &conn, HttpHandler &&handler) {
+    Connection::Buffer buf;
+    buf.reserve(4 * 1024);
     while (1) {
-      auto buf = co_await conn->read(4 * 1024).run_in(conn->loop_);
-      // fmt::print("{}\n", std::string(buf.begin(), buf.end()));
-      if (buf.size() == 0) break;
+      buf.clear();
+      ssize_t n = co_await conn->read(buf).run_in(conn->loop_);
+      if (n <= 0) break;
 
-      inbuffer_.insert(inbuffer_.end(), buf.begin(), buf.end());
+      inbuffer_.insert(inbuffer_.end(), buf.begin(), buf.begin() + n);
       auto ret = parse();
-
-      if (ret == ParseState::PARSE_OK) {
+      // auto ret = ParseState::PARSE_OK;
+      if (ret != ParseState::PARSE_OK) {
         auto resp = co_await handler(req_).run_in(conn->loop_);
-        auto s = resp.to_buffer();
         co_await conn->write(resp.to_buffer()).run_in(conn->loop_);
+        // auto s = resp.to_buffer();
         // fmt::print("{}\n", std::string(s.begin(), s.end()));
       } else {
         auto resp = get_error_resp(404, "Not Found😥");
-        auto s = resp.to_buffer();
-        co_await conn->write(resp.to_buffer()).run_in(conn->loop_);
+        // auto s = resp.to_buffer();
+        co_await conn->write(resp.to_string()).run_in(conn->loop_);
       }
       reset_state();
     }
+    conn->close();
     co_return true;
   }
   // Task<HttpResponse> proc(HttpRequest req) {
