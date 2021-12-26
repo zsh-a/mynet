@@ -19,19 +19,17 @@ EventLoop g_loop;
 
 Task<HttpResponse> hello(HttpRequest req) {
   HttpResponse resp{};
-  resp.set_body("<p>Hello, world!</p>");
+  if(req.url_ == "/hello")
+    resp.set_body("<p>Hello, world!</p>");
+  else{
+    resp = HttpResponse::get_error_resp(404,"Now found 🤔");
+  }
   co_return resp;
-}
-// TODO better api
-Task<bool> handler(Connection::Ptr conn) {
-  HttpContext ctx;
-  co_await ctx.process_http(conn, hello).run_in(conn->loop_);
-  co_return true;
 }
 
 int main() {
   {
-    HttpServer http_server{&g_loop, "0.0.0.0", 9999, "http server", handler};
+    HttpServer http_server{&g_loop, "0.0.0.0", 9999, "http server",hello,2};
     g_loop.create_task(http_server.serve());
     g_loop.run();
   }

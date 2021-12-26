@@ -121,7 +121,7 @@ class TcpServer : private NonCopyable {
 template <typename Callback>
 Task<TcpServer<Callback>> start_tcp_server(EventLoop* loop, std::string_view ip,
                                            int port, Callback cb,
-                                           std::string_view name) {
+                                           std::string_view name,int num_threads = 0) {
   addrinfo hints{.ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM};
   addrinfo* server_info{nullptr};
   auto port_str = std::to_string(port);
@@ -158,7 +158,7 @@ Task<TcpServer<Callback>> start_tcp_server(EventLoop* loop, std::string_view ip,
     exit(errno);
   }
   log::Log(log::Info, "start tcp server fd : {}", server_fd);
-  co_return TcpServer{loop, server_fd, name, cb, 0};
+  co_return TcpServer{loop, server_fd, name, cb, num_threads};
 }
 
 }  // namespace mynet

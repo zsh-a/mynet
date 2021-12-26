@@ -39,6 +39,15 @@ struct HttpResponse {
     k404NotFound = 404,
   };
 
+  constexpr static auto error_template =
+      "<html>"
+      "<head><title>{0} {1}</title></head>"
+      "<body>"
+      "<center><h1>{0} {1}</h1></center>"
+      "<hr><center>mynet</center>"
+      "</body>"
+      "</html>";
+
   static std::unordered_map<StatusCode, std::string> status_code_to_string;
 
   Version version_;
@@ -54,6 +63,13 @@ struct HttpResponse {
     char buf[128]{};
     std::strftime(buf, sizeof buf, "%a, %d %b %Y %H:%M:%S %Z", &tm);
     headers_["Date"] = fmt::format("{}", buf);
+  }
+
+  static HttpResponse get_error_resp(int code, const std::string &msg) {
+    HttpResponse resp{};
+    auto body = fmt::format(error_template, code, msg);
+    resp.set_body(body);
+    return resp;
   }
 
   void set_body(std::string s) {
@@ -259,20 +275,6 @@ class HttpContext {
     state_ = ParseState::PARSE_URL;
     std::exchange(req_, {});
   }
-  constexpr static auto error_template =
-      "<html>"
-      "<head><title>{0} {1}</title></head>"
-      "<body>"
-      "<center><h1>{0} {1}</h1></center>"
-      "<hr><center>mynet</center>"
-      "</body>"
-      "</html>";
-  HttpResponse get_error_resp(int code, const std::string &msg) {
-    HttpResponse resp{};
-    auto body = fmt::format(error_template, code, msg);
-    resp.set_body(body);
-    return resp;
-  }
 
  public:
   template <typename HttpHandler>
@@ -287,13 +289,13 @@ class HttpContext {
       inbuffer_.insert(inbuffer_.end(), buf.begin(), buf.begin() + n);
       auto ret = parse();
       // auto ret = ParseState::PARSE_OK;
-      if (ret != ParseState::PARSE_OK) {
+      if (ret == ParseState::PARSE_OK) {
         auto resp = co_await handler(req_).run_in(conn->loop_);
         co_await conn->write(resp.to_buffer()).run_in(conn->loop_);
         // auto s = resp.to_buffer();
         // fmt::print("{}\n", std::string(s.begin(), s.end()));
       } else {
-        auto resp = get_error_resp(404, "Not Found😥");
+        auto resp = HttpResponse::get_error_resp(500, "Error");
         // auto s = resp.to_buffer();
         co_await conn->write(resp.to_string()).run_in(conn->loop_);
       }
@@ -302,12 +304,6 @@ class HttpContext {
     conn->close();
     co_return true;
   }
-  // Task<HttpResponse> proc(HttpRequest req) {
-
-  //   HttpResponse resp{};
-  //   resp.set_body("<p>Hello, world!</p>");
-  //   co_return resp;
-  // }
 };
 
 }  // namespace http
